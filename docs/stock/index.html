@@ -305,6 +305,14 @@ const mulberry32 = (a) => () => {
   t ^= t + Math.imul(t ^ t >>> 7, t | 61);
   return ((t ^ t >>> 14) >>> 0) / 4294967296;
 };
+const seededShuffle = (arr, rng) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 const gauss = (rng) => {
   let u = 0, v = 0;
   while (u === 0) u = rng();
@@ -440,7 +448,7 @@ const Histogram = ({ buckets, w = 520, h = 180, accent = "var(--signal)", highli
   })());
 };
 const BeliefBar = ({ prior, posterior, label = "belief" }) => /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, label), /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--ink)" } }, Math.round(posterior * 100), "%")), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 18, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${posterior * 100}%`, background: "linear-gradient(90deg, var(--signal), var(--signal-2))", transition: "width .6s cubic-bezier(.2,.9,.3,1)" } }), prior != null && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: `${prior * 100}%`, top: -2, bottom: -2, width: 2, background: "var(--noise-2)" }, title: `Prior: ${Math.round(prior * 100)}%` })));
-Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries });
+Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries, seededShuffle });
 
 </script>
 <script>
@@ -454,10 +462,10 @@ const ElectionPrecincts = [
   { id: 7, name: "Northgate", size: 780, lean: "D", skew: 0.04, color: "var(--signal)" },
   { id: 8, name: "Bellwether HS", size: 1200, lean: "mixed", skew: 0, color: "var(--gold)" }
 ];
-const StationElection = ({ onComplete, recordScore }) => {
-  const TRUE_DSHARE = 0.514;
+const StationElection = ({ onComplete, recordScore, seed = 1 }) => {
   const results = React.useMemo(() => {
-    const rng = mulberry32(33);
+    const rng = mulberry32(seed * 97 + 41);
+    const TRUE_DSHARE = Math.max(0.46, Math.min(0.58, 0.52 + gauss(rng) * 0.025));
     return ElectionPrecincts.map((p) => {
       const trueShareHere = TRUE_DSHARE + p.skew;
       const noiseSd = 0.2 / Math.sqrt(p.size);
@@ -465,11 +473,11 @@ const StationElection = ({ onComplete, recordScore }) => {
       const dVotes = Math.round(dShareNoisy * p.size);
       return { ...p, dVotes, rVotes: p.size - dVotes, share: dShareNoisy };
     });
-  }, []);
+  }, [seed]);
   const referenceCurve = React.useMemo(() => {
     const POLL = 0.52, POLL_SD = 0.03, SIMS = 500;
     return Array.from({ length: results.length + 1 }, (_, k) => {
-      const rng = mulberry32(2e3 + k);
+      const rng = mulberry32(seed * 1009 + 2e3 + k);
       const reportedD = results.slice(0, k).reduce((s, r) => s + r.dVotes, 0);
       const reportedR = results.slice(0, k).reduce((s, r) => s + r.rVotes, 0);
       const unreported = results.slice(k);
@@ -771,7 +779,7 @@ const StockPool = [
     { kind: "news", text: "Major customer just announced a $2B order.", strength: "strong-pos" }
   ] }
 ];
-const StationStock = ({ onComplete, recordScore }) => {
+const StationStock = ({ onComplete, recordScore, seed = 1 }) => {
   const [idx, setIdx] = React.useState(0);
   const [bankroll, setBankroll] = React.useState(1e3);
   const [prob, setProb] = React.useState(50);
@@ -781,7 +789,7 @@ const StationStock = ({ onComplete, recordScore }) => {
   const cur = StockPool[idx];
   const place = () => {
     const wager2 = Math.round(bankroll * (stake / 100));
-    const rng = mulberry32(idx * 999 + Math.floor(cur.truth * 1e3));
+    const rng = mulberry32(seed * 733 + idx * 999 + Math.floor(cur.truth * 1e3));
     const up = rng() < cur.truth;
     const magBase = 2 + rng() * 9;
     const move = up ? magBase : -(magBase * 0.85);
@@ -841,6 +849,10 @@ Object.assign(window, { StationElection, StationDetective, StationStock });
   var COMP = window["StationStock"];
   var EXTRA = {};
   var h = React.createElement;
+  // Seeded runs: ?seed=N reproduces an exact run (shareable); otherwise each
+  // visit gets a fresh random seed, and every replay advances to a new one.
+  var urlSeed = parseInt(new URLSearchParams(location.search).get('seed'), 10);
+  var BASE_SEED = (Number.isFinite(urlSeed) && urlSeed > 0) ? urlSeed : (1 + Math.floor(Math.random() * 999983));
   function Header(){
     return h('div',{style:{position:'sticky',top:0,zIndex:50,backdropFilter:'blur(16px) saturate(150%)',background:'rgba(241,236,222,.78)',borderBottom:'1px solid var(--line)'}},
       h('div',{style:{maxWidth:1320,margin:'0 auto',padding:'12px 24px',display:'flex',alignItems:'center',gap:16}},
@@ -863,14 +875,21 @@ Object.assign(window, { StationElection, StationDetective, StationStock });
   }
   function Page(){
     var st = React.useState(0), k = st[0], setK = st[1];
-    function record(id,data){ window.__lastScore={id:id,data:data}; try{console.log('[score]',id,data);}catch(e){} }
+    var seed = ((BASE_SEED + k * 7919) % 999983) + 1;
+    function record(id,data){ window.__lastScore={id:id,data:data,seed:seed}; try{console.log('[score]',id,data);}catch(e){} }
     function done(){ setK(k+1); window.scrollTo({top:0}); }
+    var shareUrl = location.pathname + '?seed=' + seed;
     return h('div',{className:'shell paper'},
       h(Header,null),
       h('div',{style:{flex:1}},
-        h('div',{style:{maxWidth:980,margin:'0 auto',padding:'40px 28px 80px'}},
-          COMP ? h(COMP, Object.assign({key:k, onComplete:done, recordScore:record}, EXTRA))
+        h('div',{style:{maxWidth:980,margin:'0 auto',padding:'40px 28px 40px'}},
+          COMP ? h(COMP, Object.assign({key:k, seed:seed, onComplete:done, recordScore:record}, EXTRA))
                : h('div',{style:{padding:40,color:'var(--bad)'}},'Component StationStock failed to load.')
+        ),
+        h('div',{className:'mono',style:{textAlign:'center',fontSize:11,color:'var(--ink-4)',padding:'0 24px 48px'}},
+          'run #' + seed + ' · ',
+          h('a',{href:shareUrl,style:{color:'var(--ink-3)'}},'link to this exact run'),
+          ' · finishing a run deals fresh data'
         )
       )
     );

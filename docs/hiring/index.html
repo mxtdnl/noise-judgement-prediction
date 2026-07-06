@@ -305,6 +305,14 @@ const mulberry32 = (a) => () => {
   t ^= t + Math.imul(t ^ t >>> 7, t | 61);
   return ((t ^ t >>> 14) >>> 0) / 4294967296;
 };
+const seededShuffle = (arr, rng) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 const gauss = (rng) => {
   let u = 0, v = 0;
   while (u === 0) u = rng();
@@ -440,26 +448,33 @@ const Histogram = ({ buckets, w = 520, h = 180, accent = "var(--signal)", highli
   })());
 };
 const BeliefBar = ({ prior, posterior, label = "belief" }) => /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, label), /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--ink)" } }, Math.round(posterior * 100), "%")), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 18, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${posterior * 100}%`, background: "linear-gradient(90deg, var(--signal), var(--signal-2))", transition: "width .6s cubic-bezier(.2,.9,.3,1)" } }), prior != null && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: `${prior * 100}%`, top: -2, bottom: -2, width: 2, background: "var(--noise-2)" }, title: `Prior: ${Math.round(prior * 100)}%` })));
-Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries });
+Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries, seededShuffle });
 
 </script>
 <script>
-const OutbreakConfig = {
-  threshold: 1e3,
-  // peak cases threshold
-  startDay: 1,
-  totalDays: 12,
-  truePeakDay: 9,
-  // pre-baked daily new-case curve (a real outbreak with stochastic noise)
-  // crafted so peak happens around day 9 and total active cases peak ~1200
-  trueCurve: [12, 22, 38, 64, 110, 195, 340, 580, 920, 1180, 980, 720, 450],
-  // What a good Bayesian forecaster would believe about P(peak > 1000) given only
-  // the data available up to each day. Early on the growth rate (~1.7×/day) already
-  // implies a likely breach, so belief rises steadily; on day 10 the count hits 1,180,
-  // exceeding the threshold outright → certainty from then on.
-  referenceCurve: [0.2, 0.22, 0.25, 0.3, 0.38, 0.5, 0.68, 0.85, 0.97, 1, 1, 1, 1]
-};
-const StationOutbreak = ({ onComplete, recordScore }) => {
+const OutbreakScenarios = [
+  {
+    threshold: 1e3,
+    truePeakDay: 9,
+    // a real outbreak: sustained ~1.7×/day growth, peak ~1,180 on day 10
+    trueCurve: [12, 22, 38, 64, 110, 195, 340, 580, 920, 1180, 980, 720, 450],
+    // What a good Bayesian should believe about P(peak > 1000) given data so far.
+    // Early growth rate already implies a likely breach; day 10 exceeds it outright.
+    referenceCurve: [0.2, 0.22, 0.25, 0.3, 0.38, 0.5, 0.68, 0.85, 0.97, 1, 1, 1, 1],
+    lesson: "Exponential growth fools intuition. From day 1 (12 cases) to day 4 (64), the curve looked manageable \u2014 but at ~1.7\xD7 per day you were already more than two doublings in, and the growth rate alone implied a likely breach. By the time the peak was visible in the raw counts, the only thing left to update on was the inflection."
+  },
+  {
+    threshold: 1e3,
+    truePeakDay: 8,
+    // a contained outbreak: growth decelerates from ~70%/day to near zero, peak 172
+    trueCurve: [14, 24, 40, 62, 88, 118, 148, 168, 172, 150, 118, 84, 58],
+    // Reference belief rises a little early, then falls as deceleration shows up.
+    referenceCurve: [0.2, 0.22, 0.25, 0.28, 0.28, 0.24, 0.18, 0.11, 0.05, 0.02, 0.01, 0.01, 0.01],
+    lesson: "The growth RATE is the tell, not the case count. Cases rose every single day until day 9 \u2014 but day-over-day growth was already slowing from ~70% to ~15% by mid-week, which is exactly what containment looks like. Forecasters who watched the rising counts kept updating up; those who watched the growth rate started updating down days earlier."
+  }
+];
+const StationOutbreak = ({ onComplete, recordScore, seed = 1 }) => {
+  const OutbreakConfig = React.useMemo(() => OutbreakScenarios[Math.floor(mulberry32(seed * 47 + 5)() * OutbreakScenarios.length)], [seed]);
   const [day, setDay] = React.useState(0);
   const [prob, setProb] = React.useState(30);
   const [phase, setPhase] = React.useState("intro");
@@ -483,7 +498,7 @@ const StationOutbreak = ({ onComplete, recordScore }) => {
     setDay(day + 1);
   };
   if (phase === "intro") {
-    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Outbreak Tracker", title: "Day 1: 12 new cases reported.", accent: "var(--noise)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u26A0" }, "A novel respiratory illness has appeared in a city of 1.2M people. ", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("strong", null, "Your job:"), " forecast whether the peak daily case count will exceed ", /* @__PURE__ */ React.createElement("strong", null, OutbreakConfig.threshold.toLocaleString()), ". You'll see one day of data at a time and update your probability."), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Days to simulate", value: `${OutbreakConfig.trueCurve.length}` }), /* @__PURE__ */ React.createElement(Stat, { label: "Threshold", value: `${OutbreakConfig.threshold.toLocaleString()}`, sub: "daily new cases" }), /* @__PURE__ */ React.createElement(Stat, { label: "Day 1 cases", value: `${OutbreakConfig.trueCurve[0]}` })), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "\u25D1" }, "Compounding rule of thumb: ~doubling every 2 days is a fast-spreading outbreak. Sub-linear growth often means containment is working. Watch for inflection."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => setPhase("day") }, "Receive day 1 \u2192")));
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Outbreak Tracker", title: `Day 1: ${OutbreakConfig.trueCurve[0]} new cases reported.`, accent: "var(--noise)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u26A0" }, "A novel respiratory illness has appeared in a city of 1.2M people. ", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("strong", null, "Your job:"), " forecast whether the peak daily case count will exceed ", /* @__PURE__ */ React.createElement("strong", null, OutbreakConfig.threshold.toLocaleString()), ". You'll see one day of data at a time and update your probability."), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Days to simulate", value: `${OutbreakConfig.trueCurve.length}` }), /* @__PURE__ */ React.createElement(Stat, { label: "Threshold", value: `${OutbreakConfig.threshold.toLocaleString()}`, sub: "daily new cases" }), /* @__PURE__ */ React.createElement(Stat, { label: "Day 1 cases", value: `${OutbreakConfig.trueCurve[0]}` })), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "\u25D1" }, "Compounding rule of thumb: ~doubling every 2 days is a fast-spreading outbreak. Sub-linear growth often means containment is working. Watch for inflection."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => setPhase("day") }, "Receive day 1 \u2192")));
   }
   if (phase === "done") {
     const actualPeak = Math.max(...OutbreakConfig.trueCurve);
@@ -524,8 +539,8 @@ const StationOutbreak = ({ onComplete, recordScore }) => {
     }), /* @__PURE__ */ React.createElement("text", { x: "34", y: "14", fontSize: "10", fill: "var(--signal)", className: "mono" }, "\u2014 you"), /* @__PURE__ */ React.createElement("text", { x: "100", y: "14", fontSize: "10", fill: "var(--gold)", className: "mono" }, "- - reference forecaster"), /* @__PURE__ */ React.createElement("text", { x: "50", y: "232", fontSize: "10", fill: "var(--ink-3)", className: "mono" }, "day 1"), /* @__PURE__ */ React.createElement("text", { x: "510", y: "232", fontSize: "10", fill: "var(--ink-3)", textAnchor: "end", className: "mono" }, "day ", OutbreakConfig.trueCurve.length))), (() => {
       const refGap = log.reduce((s, u) => s + Math.abs(u.prob / 100 - OutbreakConfig.referenceCurve[u.day]), 0) / (log.length || 1);
       const gapPts = Math.round(refGap * 100);
-      return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Final P(peak >)", value: `${prob}%`, tone: "signal" }), /* @__PURE__ */ React.createElement(Stat, { label: "Gap vs. reference", value: `${gapPts} pts`, tone: refGap < 0.12 ? "good" : refGap < 0.22 ? "neutral" : "bad", sub: "avg |you \u2212 reference|" }), /* @__PURE__ */ React.createElement(Stat, { label: "Reference (final)", value: "100%", sub: "peak breached on day 10" })), /* @__PURE__ */ React.createElement(Callout, { tone: refGap < 0.12 ? "good" : refGap < 0.22 ? "gold" : "noise", icon: refGap < 0.12 ? "\u2713" : refGap < 0.22 ? "\u25D1" : "\u2717" }, /* @__PURE__ */ React.createElement("strong", null, refGap < 0.12 ? "You tracked the reference forecaster closely." : refGap < 0.22 ? "Roughly on the reference curve, with some lag." : "You lagged the reference forecaster badly."), " You're graded against what a good Bayesian should have believed each day given the data ", /* @__PURE__ */ React.createElement("em", null, "so far"), ' \u2014 not against the eventual outcome, so a lucky "100% on day 1" would score badly too.'));
-    })(), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25D1" }, /* @__PURE__ */ React.createElement("strong", null, "The lesson:"), " exponential growth fools intuition. From day 1 (12 cases) to day 4 (64), the curve looked manageable \u2014 but at ~1.7\xD7 per day you were already more than two doublings in, and the growth ", /* @__PURE__ */ React.createElement("em", null, "rate"), " alone implied a likely breach. By the time the peak was visible in the raw counts, the only thing left to update on was the inflection."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: onComplete }, "Back to lab \u2192")));
+      return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Final P(peak >)", value: `${prob}%`, tone: "signal" }), /* @__PURE__ */ React.createElement(Stat, { label: "Gap vs. reference", value: `${gapPts} pts`, tone: refGap < 0.12 ? "good" : refGap < 0.22 ? "neutral" : "bad", sub: "avg |you \u2212 reference|" }), /* @__PURE__ */ React.createElement(Stat, { label: "Reference (final)", value: `${Math.round(OutbreakConfig.referenceCurve[OutbreakConfig.referenceCurve.length - 1] * 100)}%`, sub: wentAbove ? "threshold was breached" : "threshold never breached" })), /* @__PURE__ */ React.createElement(Callout, { tone: refGap < 0.12 ? "good" : refGap < 0.22 ? "gold" : "noise", icon: refGap < 0.12 ? "\u2713" : refGap < 0.22 ? "\u25D1" : "\u2717" }, /* @__PURE__ */ React.createElement("strong", null, refGap < 0.12 ? "You tracked the reference forecaster closely." : refGap < 0.22 ? "Roughly on the reference curve, with some lag." : "You lagged the reference forecaster badly."), " You're graded against what a good Bayesian should have believed each day given the data ", /* @__PURE__ */ React.createElement("em", null, "so far"), ' \u2014 not against the eventual outcome, so a lucky "100% on day 1" would score badly too.'));
+    })(), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25D1" }, /* @__PURE__ */ React.createElement("strong", null, "The lesson:"), " ", OutbreakConfig.lesson), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: onComplete }, "Back to lab \u2192")));
   }
   const todayCases = OutbreakConfig.trueCurve[day];
   const yesterdayCases = day > 0 ? OutbreakConfig.trueCurve[day - 1] : null;
@@ -664,6 +679,10 @@ Object.assign(window, { StationOutbreak, StationAB, StationHiring });
   var COMP = window["StationHiring"];
   var EXTRA = {};
   var h = React.createElement;
+  // Seeded runs: ?seed=N reproduces an exact run (shareable); otherwise each
+  // visit gets a fresh random seed, and every replay advances to a new one.
+  var urlSeed = parseInt(new URLSearchParams(location.search).get('seed'), 10);
+  var BASE_SEED = (Number.isFinite(urlSeed) && urlSeed > 0) ? urlSeed : (1 + Math.floor(Math.random() * 999983));
   function Header(){
     return h('div',{style:{position:'sticky',top:0,zIndex:50,backdropFilter:'blur(16px) saturate(150%)',background:'rgba(241,236,222,.78)',borderBottom:'1px solid var(--line)'}},
       h('div',{style:{maxWidth:1320,margin:'0 auto',padding:'12px 24px',display:'flex',alignItems:'center',gap:16}},
@@ -686,14 +705,21 @@ Object.assign(window, { StationOutbreak, StationAB, StationHiring });
   }
   function Page(){
     var st = React.useState(0), k = st[0], setK = st[1];
-    function record(id,data){ window.__lastScore={id:id,data:data}; try{console.log('[score]',id,data);}catch(e){} }
+    var seed = ((BASE_SEED + k * 7919) % 999983) + 1;
+    function record(id,data){ window.__lastScore={id:id,data:data,seed:seed}; try{console.log('[score]',id,data);}catch(e){} }
     function done(){ setK(k+1); window.scrollTo({top:0}); }
+    var shareUrl = location.pathname + '?seed=' + seed;
     return h('div',{className:'shell paper'},
       h(Header,null),
       h('div',{style:{flex:1}},
-        h('div',{style:{maxWidth:1020,margin:'0 auto',padding:'40px 28px 80px'}},
-          COMP ? h(COMP, Object.assign({key:k, onComplete:done, recordScore:record}, EXTRA))
+        h('div',{style:{maxWidth:1020,margin:'0 auto',padding:'40px 28px 40px'}},
+          COMP ? h(COMP, Object.assign({key:k, seed:seed, onComplete:done, recordScore:record}, EXTRA))
                : h('div',{style:{padding:40,color:'var(--bad)'}},'Component StationHiring failed to load.')
+        ),
+        h('div',{className:'mono',style:{textAlign:'center',fontSize:11,color:'var(--ink-4)',padding:'0 24px 48px'}},
+          'run #' + seed + ' · ',
+          h('a',{href:shareUrl,style:{color:'var(--ink-3)'}},'link to this exact run'),
+          ' · finishing a run deals fresh data'
         )
       )
     );

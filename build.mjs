@@ -27,7 +27,7 @@ const COMPONENTS = [
   { id:'calibration', comp:'StationCalibration', file:'stations', maxW:920,  extra:{}, group:'Core stations', n:'02', label:'Calibration Quiz',       blurb:'How sure are you, really?',         concept:'Confidence calibration',    color:'var(--signal)' },
   { id:'brier',       comp:'StationBrier',       file:'stations', maxW:920,  extra:{}, group:'Core stations', n:'03', label:'Brier Arena',            blurb:'Probabilities, scored',             concept:'Brier scoring rule',        color:'var(--gold)' },
   { id:'base-rate',   comp:'StationBaseRate',    file:'stations', maxW:1020, extra:{}, group:'Core stations', n:'04', label:'Base Rate Trap',         blurb:'The 1%-disease puzzle',             concept:'Priors & base rates',       color:'var(--noise-2)' },
-  { id:'bayes',       comp:'StationBayes',       file:'stations', maxW:1040, extra:{ scenarioIdx:0 }, group:'Core stations', n:'05', label:'Bayesian Theater',       blurb:'Move beliefs with evidence',        concept:'Bayesian updating',         color:'var(--signal-2)' },
+  { id:'bayes',       comp:'StationBayes',       file:'stations', maxW:1040, extra:{}, group:'Core stations', n:'05', label:'Bayesian Theater',       blurb:'Move beliefs with evidence',        concept:'Bayesian updating',         color:'var(--signal-2)' },
   { id:'crowd',       comp:'StationCrowd',       file:'stations', maxW:1000, extra:{}, group:'Core stations', n:'06', label:'Wisdom of Crowds',       blurb:'You vs. the aggregate',             concept:'Aggregation & sample size', color:'var(--leaf)' },
   // Quick drills
   { id:'tournament',  comp:'StationTournament',  file:'sims-drills', maxW:920, extra:{}, group:'Quick drills', label:"Forecaster's Tournament", blurb:'Rapid probability calls, scored by Brier', concept:'Brier scoring · calibration', color:'var(--gold)' },
@@ -63,6 +63,10 @@ const bootstrap = (c) => `
   var COMP = window[${JSON.stringify(c.comp)}];
   var EXTRA = ${JSON.stringify(c.extra || {})};
   var h = React.createElement;
+  // Seeded runs: ?seed=N reproduces an exact run (shareable); otherwise each
+  // visit gets a fresh random seed, and every replay advances to a new one.
+  var urlSeed = parseInt(new URLSearchParams(location.search).get('seed'), 10);
+  var BASE_SEED = (Number.isFinite(urlSeed) && urlSeed > 0) ? urlSeed : (1 + Math.floor(Math.random() * 999983));
   function Header(){
     return h('div',{style:{position:'sticky',top:0,zIndex:50,backdropFilter:'blur(16px) saturate(150%)',background:'rgba(241,236,222,.78)',borderBottom:'1px solid var(--line)'}},
       h('div',{style:{maxWidth:1320,margin:'0 auto',padding:'12px 24px',display:'flex',alignItems:'center',gap:16}},
@@ -85,14 +89,21 @@ const bootstrap = (c) => `
   }
   function Page(){
     var st = React.useState(0), k = st[0], setK = st[1];
-    function record(id,data){ window.__lastScore={id:id,data:data}; try{console.log('[score]',id,data);}catch(e){} }
+    var seed = ((BASE_SEED + k * 7919) % 999983) + 1;
+    function record(id,data){ window.__lastScore={id:id,data:data,seed:seed}; try{console.log('[score]',id,data);}catch(e){} }
     function done(){ setK(k+1); window.scrollTo({top:0}); }
+    var shareUrl = location.pathname + '?seed=' + seed;
     return h('div',{className:'shell paper'},
       h(Header,null),
       h('div',{style:{flex:1}},
-        h('div',{style:{maxWidth:${c.maxW},margin:'0 auto',padding:'40px 28px 80px'}},
-          COMP ? h(COMP, Object.assign({key:k, onComplete:done, recordScore:record}, EXTRA))
+        h('div',{style:{maxWidth:${c.maxW},margin:'0 auto',padding:'40px 28px 40px'}},
+          COMP ? h(COMP, Object.assign({key:k, seed:seed, onComplete:done, recordScore:record}, EXTRA))
                : h('div',{style:{padding:40,color:'var(--bad)'}},'Component ${c.comp} failed to load.')
+        ),
+        h('div',{className:'mono',style:{textAlign:'center',fontSize:11,color:'var(--ink-4)',padding:'0 24px 48px'}},
+          'run #' + seed + ' · ',
+          h('a',{href:shareUrl,style:{color:'var(--ink-3)'}},'link to this exact run'),
+          ' · finishing a run deals fresh data'
         )
       )
     );
