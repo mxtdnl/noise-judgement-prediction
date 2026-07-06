@@ -177,7 +177,7 @@ const StationCalibration = ({ onComplete, recordScore, seed=1 }) => {
         <p style={{ color:'var(--ink-2)', marginTop:0 }}>For each confidence level you used, here's how often you were actually right. The dashed line is perfect calibration. <strong>Below the line = overconfidence.</strong></p>
         <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr', gap:24, alignItems:'center', marginTop:12 }}>
           <div style={{ background:'var(--bg-soft)', borderRadius:18, padding:14, border:'1px solid var(--line)'}}>
-            <CalibrationPlot buckets={buckets}/>
+            <CalibrationPlot buckets={buckets} xMin={0.5}/>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <Stat label="Score" value={`${finalLog.filter(e=>e.correct).length}/${finalLog.length}`} sub="raw accuracy" />

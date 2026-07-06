@@ -81,45 +81,58 @@ const TimeSeriesChart = ({ data, w=520, h=220, showSignal=false, color='var(--in
   );
 };
 
-// Calibration plot — buckets of (predicted prob, observed frequency)
-const CalibrationPlot = ({ buckets, w=380, h=380 }) => {
+// Calibration plot — buckets of (predicted prob, observed frequency).
+// xMin lets the x-axis start at 0.5 for 2AFC quizzes (confidence can't go below
+// a coin flip), so the data fills the plot instead of cramming into one half.
+const CalibrationPlot = ({ buckets, w=380, h=380, xMin=0 }) => {
   const pad = 44;
-  const sx = (p) => pad + p * (w - pad*2);
+  const sx = (p) => pad + ((p - xMin) / (1 - xMin)) * (w - pad*2);
   const sy = (p) => h - pad - p * (h - pad*2);
+  const xTicks = xMin === 0 ? [0,.25,.5,.75,1] : [.5,.6,.7,.8,.9,1];
+  const yTicks = [0,.25,.5,.75,1];
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" style={{ display:'block', maxHeight:h }}>
-      {/* axes grid */}
-      {[0,.25,.5,.75,1].map((t,i)=>(
-        <g key={i}>
+      {/* axes grid + tick labels */}
+      {xTicks.map((t,i)=>(
+        <g key={'x'+i}>
           <line x1={sx(t)} x2={sx(t)} y1={sy(0)} y2={sy(1)} stroke="var(--line)" strokeDasharray="2 4"/>
-          <line x1={sx(0)} x2={sx(1)} y1={sy(t)} y2={sy(t)} stroke="var(--line)" strokeDasharray="2 4"/>
+          <text x={sx(t)} y={sy(0)+16} fontSize="10" fill="var(--ink-4)" textAnchor="middle" className="mono">{Math.round(t*100)}%</text>
         </g>
       ))}
-      {/* perfect diagonal */}
-      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(1)} stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="4 5"/>
+      {yTicks.map((t,i)=>(
+        <g key={'y'+i}>
+          <line x1={sx(xMin)} x2={sx(1)} y1={sy(t)} y2={sy(t)} stroke="var(--line)" strokeDasharray="2 4"/>
+          <text x={sx(xMin)-8} y={sy(t)+3} fontSize="10" fill="var(--ink-4)" textAnchor="end" className="mono">{Math.round(t*100)}%</text>
+        </g>
+      ))}
+      {/* perfect-calibration diagonal (accuracy = stated confidence) */}
+      <line x1={sx(xMin)} y1={sy(xMin)} x2={sx(1)} y2={sy(1)} stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="4 5"/>
+      <text x={sx(xMin + (1-xMin)*.42)} y={sy(xMin + (1-xMin)*.42) - 8} fontSize="9.5" fill="var(--ink-4)" className="mono"
+        transform={`rotate(-45 ${sx(xMin + (1-xMin)*.42)} ${sy(xMin + (1-xMin)*.42)})`}>perfect calibration</text>
       {/* axes */}
-      <line x1={sx(0)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="var(--ink)" strokeWidth="1.5"/>
-      <line x1={sx(0)} y1={sy(0)} x2={sx(0)} y2={sy(1)} stroke="var(--ink)" strokeWidth="1.5"/>
-      {/* connecting line for user buckets */}
+      <line x1={sx(xMin)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="var(--ink)" strokeWidth="1.5"/>
+      <line x1={sx(xMin)} y1={sy(0)} x2={sx(xMin)} y2={sy(1)} stroke="var(--ink)" strokeWidth="1.5"/>
+      {/* connecting line for user buckets — kept subtle: with few answers per
+          bucket the segment swings are mostly sampling noise */}
       {(() => {
         const pts = buckets.filter(b=>b.n>0).map(b => [sx(b.p), sy(b.freq)]);
         if (pts.length < 2) return null;
-        return <polyline points={pts.map(p=>p.join(',')).join(' ')} fill="none" stroke="var(--signal)" strokeWidth="2.5" opacity=".75"/>;
+        return <polyline points={pts.map(p=>p.join(',')).join(' ')} fill="none" stroke="var(--signal)" strokeWidth="1.5" strokeDasharray="1 4" strokeLinecap="round" opacity=".55"/>;
       })()}
-      {/* dots */}
+      {/* dots (area scales with bucket size) */}
       {buckets.map((b, i) => b.n > 0 && (
         <g key={i}>
           <circle cx={sx(b.p)} cy={sy(b.freq)} r={6 + Math.min(b.n, 8) * 1.5} fill="var(--signal)" opacity=".18"/>
           <circle cx={sx(b.p)} cy={sy(b.freq)} r={5.5} fill="var(--signal)" stroke="#fff" strokeWidth="2"/>
-          <text x={sx(b.p)} y={sy(b.freq)-12} fontSize="10" fill="var(--ink-2)" textAnchor="middle" className="mono">{b.n}</text>
+          <text x={sx(b.p)} y={sy(b.freq)-12} fontSize="10" fill="var(--ink-2)" textAnchor="middle" className="mono">{b.n}×</text>
         </g>
       ))}
       {/* labels */}
-      <text x={sx(.5)} y={h-8} textAnchor="middle" fontSize="12" fill="var(--ink-3)">your stated probability →</text>
-      <text x={12} y={sy(.5)} textAnchor="middle" fontSize="12" fill="var(--ink-3)" transform={`rotate(-90 12 ${sy(.5)})`}>actual frequency →</text>
+      <text x={sx(xMin + (1-xMin)/2)} y={h-8} textAnchor="middle" fontSize="12" fill="var(--ink-3)">your stated confidence →</text>
+      <text x={12} y={sy(.5)} textAnchor="middle" fontSize="12" fill="var(--ink-3)" transform={`rotate(-90 12 ${sy(.5)})`}>how often you were right →</text>
       {/* corner annotations */}
-      <text x={sx(.05)} y={sy(.95)} fontSize="10" fill="var(--ink-4)" className="mono">under-confident</text>
-      <text x={sx(.95)} y={sy(.08)} fontSize="10" fill="var(--ink-4)" className="mono" textAnchor="end">over-confident</text>
+      <text x={sx(xMin + (1-xMin)*.04)} y={sy(.93)} fontSize="10" fill="var(--ink-4)" className="mono">under-confident ↑</text>
+      <text x={sx(.97)} y={sy(.10)} fontSize="10" fill="var(--ink-4)" className="mono" textAnchor="end">↓ over-confident</text>
     </svg>
   );
 };
