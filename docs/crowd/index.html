@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wisdom of Crowds · Signal & Noise Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+    :root{
+      --bg:#F1ECDE;
+      --bg-card:#FFFDF6;
+      --bg-soft:#EBE4D2;
+      --ink:#1A1814;
+      --ink-2:#3C372E;
+      --ink-3:#6B6457;
+      --ink-4:#9A917F;
+      --line:#E2D9C2;
+      --line-2:#D2C7A8;
+      --signal:#1E5F70;
+      --signal-2:#2A8295;
+      --signal-soft:#D6E6E9;
+      --noise:#E66B3D;
+      --noise-2:#CA5430;
+      --noise-soft:#F7DBCB;
+      --gold:#C99425;
+      --gold-soft:#F2E2B5;
+      --leaf:#5A7A3D;
+      --leaf-soft:#DBE5C7;
+      --bad:#B6402A;
+      --good:#3F7A4A;
+      --r-sm:8px; --r-md:14px; --r-lg:22px; --r-xl:32px;
+      --shadow-sm:0 1px 0 rgba(0,0,0,.04), 0 1px 2px rgba(46,38,20,.06);
+      --shadow-md:0 1px 0 rgba(255,253,246,.7) inset, 0 1px 0 rgba(0,0,0,.04), 0 6px 18px rgba(46,38,20,.08);
+      --shadow-lg:0 1px 0 rgba(255,253,246,.7) inset, 0 8px 32px rgba(46,38,20,.14);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+      font-family:"Geist","Geist Fallback",ui-sans-serif,system-ui,sans-serif;
+      font-feature-settings:"ss01","ss02","cv11";
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+    body{min-height:100vh;overflow-x:hidden}
+    .serif{font-family:"Newsreader",ui-serif,Georgia,serif; font-weight:500; letter-spacing:-.01em}
+    .mono{font-family:"Geist Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+    button{font-family:inherit; color:inherit}
+    a{color:inherit}
+
+    /* paper texture */
+    .paper{
+      background:
+        radial-gradient(1200px 600px at 90% -10%, rgba(201,148,37,.06), transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, rgba(30,95,112,.06), transparent 55%),
+        var(--bg);
+    }
+
+    /* generic */
+    .card{background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-md)}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid var(--line-2); background:var(--bg-card); color:var(--ink-2)}
+    .kbd{font-family:"Geist Mono",monospace; font-size:11px; padding:2px 6px; border-radius:5px; background:var(--bg-soft); border:1px solid var(--line-2); color:var(--ink-2)}
+
+    /* button reset for our React Button */
+    .btn{appearance:none; border:0; cursor:pointer; transition:transform .12s ease, box-shadow .2s ease, background .2s ease}
+    .btn:active{transform:translateY(1px)}
+
+    /* slider track */
+    input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:36px; background:transparent; cursor:pointer}
+    input[type=range]:focus{outline:none}
+    input[type=range]::-webkit-slider-runnable-track{height:8px; border-radius:999px; background:var(--bg-soft); border:1px solid var(--line)}
+    input[type=range]::-moz-range-track{height:8px; border-radius:999px; background:var(--bg-soft); border:1px solid var(--line)}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%; background:var(--ink); border:3px solid #FFFDF6; box-shadow:0 2px 8px rgba(0,0,0,.18); margin-top:-10px}
+    input[type=range]::-moz-range-thumb{width:24px; height:24px; border-radius:50%; background:var(--ink); border:3px solid #FFFDF6; box-shadow:0 2px 8px rgba(0,0,0,.18)}
+
+    /* scrollbar */
+    ::-webkit-scrollbar{width:10px; height:10px}
+    ::-webkit-scrollbar-thumb{background:rgba(60,55,46,.25); border-radius:8px; border:2px solid transparent; background-clip:content-box}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(60,55,46,.4); background-clip:content-box; border:2px solid transparent}
+
+    /* layout */
+    .shell{min-height:100vh; display:flex; flex-direction:column}
+    .topbar{position:sticky; top:0; z-index:50; backdrop-filter:blur(16px) saturate(150%); background:rgba(241,236,222,.78); border-bottom:1px solid var(--line)}
+
+    /* animations */
+    @keyframes fadeUp{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+    .fadeup{animation:fadeUp .35s ease-out both}
+    @keyframes pop{from{transform:scale(.94); opacity:0} to{transform:scale(1); opacity:1}}
+    .pop{animation:pop .25s cubic-bezier(.2,.9,.3,1.2) both}
+    @keyframes pulse{0%,100%{opacity:.8} 50%{opacity:.35}}
+    .pulse{animation:pulse 1.6s ease-in-out infinite}
+
+    /* sr-only */
+    .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* dark variant overrides applied through .theme-dark wrapper */
+    .theme-dark{
+      --bg:#16140F; --bg-card:#201D17; --bg-soft:#2A2620; --ink:#F2EBD8; --ink-2:#D7CFB8;
+      --ink-3:#9B9279; --ink-4:#6C6552; --line:#332E25; --line-2:#3F392E;
+      --signal-soft:#163942; --noise-soft:#3C2418; --gold-soft:#3B2F11; --leaf-soft:#293321;
+    }
+    .theme-dark .paper{background:
+      radial-gradient(1200px 600px at 90% -10%, rgba(201,148,37,.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(42,130,149,.10), transparent 55%),
+      var(--bg);}
+    .theme-dark input[type=range]::-webkit-slider-thumb{background:#F2EBD8; border-color:#201D17}
+    .theme-dark .topbar{background:rgba(22,20,15,.78)}
+
+    /* cool variant */
+    .theme-cool{
+      --bg:#ECEEF1; --bg-card:#FFFFFF; --bg-soft:#E1E5EA; --ink:#11161D; --ink-2:#2D343F;
+      --ink-3:#5B6471; --ink-4:#8A93A1; --line:#D8DDE3; --line-2:#C5CCD4;
+      --signal:#1C5BBE; --signal-2:#3D7DDF; --signal-soft:#D7E4F7;
+      --noise:#D24A6B; --noise-2:#B53757; --noise-soft:#F4D6DF;
+      --gold:#A6822D; --gold-soft:#EFE0BA; --leaf:#3A7A6A; --leaf-soft:#D0E4DC;
+    }
+
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="../shared/react.production.min.js"></script>
+<script src="../shared/react-dom.production.min.js"></script>
+<script>
+const Button = ({ children, variant = "primary", size = "md", disabled, onClick, style, icon }) => {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontWeight: 600,
+    letterSpacing: "-.01em",
+    borderRadius: 999,
+    border: "1px solid transparent",
+    whiteSpace: "nowrap",
+    boxShadow: "var(--shadow-sm)",
+    transition: "all .18s ease"
+  };
+  const sizes = {
+    sm: { padding: "7px 14px", fontSize: 13 },
+    md: { padding: "11px 20px", fontSize: 14.5 },
+    lg: { padding: "14px 26px", fontSize: 16 }
+  };
+  const variants = {
+    primary: { background: "var(--ink)", color: "var(--bg-card)", borderColor: "var(--ink)" },
+    signal: { background: "var(--signal)", color: "#fff", borderColor: "var(--signal)" },
+    noise: { background: "var(--noise)", color: "#fff", borderColor: "var(--noise)" },
+    ghost: { background: "transparent", color: "var(--ink-2)", borderColor: "var(--line-2)" },
+    soft: { background: "var(--bg-soft)", color: "var(--ink)", borderColor: "var(--line)" },
+    quiet: { background: "transparent", color: "var(--ink-3)", borderColor: "transparent", boxShadow: "none" }
+  };
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "btn",
+      disabled,
+      onClick,
+      style: { ...base, ...sizes[size], ...variants[variant], opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer", ...style }
+    },
+    icon,
+    children
+  );
+};
+const Panel = ({ title, eyebrow, children, style, accent }) => /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: "28px 30px", position: "relative", ...style } }, accent && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 30, right: 30, height: 3, background: accent, borderRadius: "0 0 4px 4px" } }), eyebrow && /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, textTransform: "uppercase", letterSpacing: ".14em", color: "var(--ink-4)", marginBottom: 10 } }, eyebrow), title && /* @__PURE__ */ React.createElement("h2", { className: "serif", style: { margin: "0 0 14px", fontSize: 28, lineHeight: 1.1, color: "var(--ink)" } }, title), children);
+const Chip = ({ children, tone = "neutral", active, onClick, style }) => {
+  const tones = {
+    neutral: { background: "var(--bg-soft)", color: "var(--ink-2)", border: "1px solid var(--line-2)" },
+    signal: { background: "var(--signal-soft)", color: "var(--signal)", border: "1px solid color-mix(in oklab, var(--signal) 25%, transparent)" },
+    noise: { background: "var(--noise-soft)", color: "var(--noise-2)", border: "1px solid color-mix(in oklab, var(--noise) 25%, transparent)" },
+    gold: { background: "var(--gold-soft)", color: "var(--gold)", border: "1px solid color-mix(in oklab, var(--gold) 25%, transparent)" },
+    leaf: { background: "var(--leaf-soft)", color: "var(--leaf)", border: "1px solid color-mix(in oklab, var(--leaf) 25%, transparent)" }
+  };
+  return /* @__PURE__ */ React.createElement(
+    "span",
+    {
+      onClick,
+      role: onClick ? "button" : void 0,
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 11px",
+        borderRadius: 999,
+        fontSize: 12.5,
+        fontWeight: 500,
+        cursor: onClick ? "pointer" : "default",
+        ...tones[tone],
+        ...active ? { outline: "2px solid var(--ink)", outlineOffset: 2 } : {},
+        ...style
+      }
+    },
+    children
+  );
+};
+const ProbabilitySlider = ({ value, onChange, lowLabel = "No", highLabel = "Yes", accent = "var(--signal)" }) => {
+  const v = Math.max(0, Math.min(100, value));
+  return /* @__PURE__ */ React.createElement("div", { style: { width: "100%" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 10, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${v}%`, background: accent, transition: "width .15s ease" } })), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "range",
+      min: "0",
+      max: "100",
+      value: v,
+      onChange: (e) => onChange(+e.target.value),
+      style: { marginTop: -22, position: "relative", zIndex: 2 }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--ink-3)", marginTop: -2 } }, /* @__PURE__ */ React.createElement("span", null, lowLabel), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--ink)", fontWeight: 600, fontSize: 18 } }, v, "%"), /* @__PURE__ */ React.createElement("span", null, highLabel)));
+};
+const CIInput = ({ low, mid, high, min, max, unit = "", onChange }) => {
+  const range = max - min;
+  const pct = (v) => (v - min) / range * 100;
+  const fmt = (n) => {
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k";
+    return Math.round(n).toString();
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 40, marginTop: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 18, left: 0, right: 0, height: 4, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 18, left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%`, height: 4, borderRadius: 999, background: "var(--signal)" } }), [
+    { v: low, key: "low", label: "low" },
+    { v: mid, key: "mid", label: "best" },
+    { v: high, key: "high", label: "high" }
+  ].map((h) => /* @__PURE__ */ React.createElement("div", { key: h.key, style: { position: "absolute", top: 6, left: `calc(${pct(h.v)}% - 14px)`, width: 28, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 18, height: 28, margin: "0 auto", borderRadius: 6, background: h.key === "mid" ? "var(--ink)" : "var(--bg-card)", border: "2px solid var(--ink)", boxShadow: "var(--shadow-sm)" } }), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-3)", marginTop: 2 } }, h.label)))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 18 } }, [["low", "5%"], ["mid", "best guess"], ["high", "95%"]].map(([k, lbl]) => /* @__PURE__ */ React.createElement("label", { key: k, style: { display: "block" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 } }, lbl), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, background: "var(--bg-soft)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      value: k === "low" ? low : k === "mid" ? mid : high,
+      onChange: (e) => {
+        const v = +e.target.value;
+        onChange({ low: k === "low" ? v : low, mid: k === "mid" ? v : mid, high: k === "high" ? v : high });
+      },
+      style: { flex: 1, border: 0, outline: 0, background: "transparent", font: '500 16px/1.2 "Geist Mono",monospace', color: "var(--ink)", width: "100%" }
+    }
+  ), unit && /* @__PURE__ */ React.createElement("span", { className: "mono", style: { color: "var(--ink-3)", fontSize: 13 } }, unit))))));
+};
+const ConfidenceSlider = ({ value, onChange, min = 0, max = 100 }) => {
+  const v = Math.max(min, Math.min(max, value));
+  const pct = (v - min) / (max - min) * 100;
+  const labels = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(min + f * (max - min)));
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 14, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: "linear-gradient(90deg, var(--signal-soft), var(--signal))", transition: "width .12s ease" } }), [20, 40, 60, 80].map((t) => /* @__PURE__ */ React.createElement("div", { key: t, style: { position: "absolute", left: `${t}%`, top: 0, bottom: 0, width: 1, background: "rgba(0,0,0,.08)" } }))), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "range",
+      min,
+      max,
+      value: v,
+      step: "1",
+      onChange: (e) => onChange(+e.target.value),
+      style: { marginTop: -24, position: "relative", zIndex: 2 }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-4)", marginTop: -4, padding: "0 2px" } }, labels.map((l, i) => /* @__PURE__ */ React.createElement("span", { key: i }, l, "%"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginTop: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 24px", borderRadius: 999, background: "var(--ink)", color: "var(--bg-card)", fontFamily: '"Geist Mono",monospace', fontSize: 28, fontWeight: 600, letterSpacing: "-.02em" } }, v, "%")));
+};
+const Stat = ({ label, value, sub, tone = "neutral" }) => {
+  const colors = {
+    neutral: "var(--ink)",
+    good: "var(--good)",
+    bad: "var(--bad)",
+    signal: "var(--signal)",
+    noise: "var(--noise-2)"
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, label), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 28, fontWeight: 600, color: colors[tone], marginTop: 2, lineHeight: 1.05 } }, value), sub && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--ink-3)", marginTop: 2 } }, sub));
+};
+const Callout = ({ children, tone = "neutral", icon }) => {
+  const tones = {
+    neutral: { background: "var(--bg-soft)", border: "1px solid var(--line)" },
+    signal: { background: "var(--signal-soft)", border: "1px solid color-mix(in oklab, var(--signal) 20%, transparent)" },
+    noise: { background: "var(--noise-soft)", border: "1px solid color-mix(in oklab, var(--noise) 25%, transparent)" },
+    gold: { background: "var(--gold-soft)", border: "1px solid color-mix(in oklab, var(--gold) 25%, transparent)" },
+    good: { background: "var(--leaf-soft)", border: "1px solid color-mix(in oklab, var(--leaf) 25%, transparent)" }
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, padding: "14px 16px", borderRadius: 14, ...tones[tone] } }, icon && /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 24px", fontSize: 18, lineHeight: 1 } }, icon), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14.5, lineHeight: 1.55, color: "var(--ink-2)" } }, children));
+};
+const ProgressDots = ({ total, current }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, Array.from({ length: total }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: {
+  width: i === current ? 24 : 8,
+  height: 8,
+  borderRadius: 999,
+  background: i < current ? "var(--ink)" : i === current ? "var(--ink)" : "var(--line-2)",
+  transition: "all .25s ease"
+} })));
+const Stamp = ({ label, tone = "good" }) => {
+  const tones = {
+    good: { color: "var(--good)", borderColor: "var(--good)" },
+    bad: { color: "var(--bad)", borderColor: "var(--bad)" },
+    gold: { color: "var(--gold)", borderColor: "var(--gold)" }
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "mono", style: {
+    display: "inline-block",
+    padding: "4px 10px",
+    borderRadius: 6,
+    border: `1.5px solid ${tones[tone].borderColor}`,
+    color: tones[tone].color,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: ".16em",
+    textTransform: "uppercase",
+    transform: "rotate(-2deg)"
+  } }, label);
+};
+Object.assign(window, { Button, Panel, Chip, ProbabilitySlider, ConfidenceSlider, CIInput, Stat, Callout, ProgressDots, Stamp });
+
+</script>
+<script>
+const mulberry32 = (a) => () => {
+  a |= 0;
+  a = a + 1831565813 | 0;
+  let t = a;
+  t = Math.imul(t ^ t >>> 15, t | 1);
+  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+};
+const gauss = (rng) => {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+};
+const genSeries = ({ seed = 1, n = 40, signal = "none", noise = 8, bias = 50 } = {}) => {
+  const rng = mulberry32(seed);
+  const points = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    let sig = bias;
+    if (signal === "up") sig = bias + (t - 0.5) * 30;
+    if (signal === "down") sig = bias - (t - 0.5) * 30;
+    if (signal === "step") sig = bias + (t > 0.55 ? 16 : -4);
+    if (signal === "cycle") sig = bias + Math.sin(t * Math.PI * 2.2) * 14;
+    if (signal === "none") sig = bias;
+    const y = sig + gauss(rng) * noise;
+    points.push({ x: i, y, sig });
+  }
+  return points;
+};
+const TimeSeriesChart = ({ data, w = 520, h = 220, showSignal = false, color = "var(--ink-2)", signalColor = "var(--signal)", highlight = null, mark = null }) => {
+  const pad = { l: 36, r: 16, t: 16, b: 26 };
+  const xs = data.map((d) => d.x);
+  const ys = data.map((d) => d.y);
+  const minY = Math.min(...ys, ...showSignal ? data.map((d) => d.sig) : []);
+  const maxY = Math.max(...ys, ...showSignal ? data.map((d) => d.sig) : []);
+  const padY = (maxY - minY) * 0.18 || 5;
+  const yMin = minY - padY, yMax = maxY + padY;
+  const sx = (x) => pad.l + x / (data.length - 1) * (w - pad.l - pad.r);
+  const sy = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * (h - pad.t - pad.b);
+  const path = data.map((d, i) => `${i ? "L" : "M"} ${sx(d.x)} ${sy(d.y)}`).join(" ");
+  const sigPath = data.map((d, i) => `${i ? "L" : "M"} ${sx(d.x)} ${sy(d.sig)}`).join(" ");
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement(
+    "line",
+    {
+      key: i,
+      x1: pad.l,
+      x2: w - pad.r,
+      y1: pad.t + t * (h - pad.t - pad.b),
+      y2: pad.t + t * (h - pad.t - pad.b),
+      stroke: "var(--line)",
+      strokeWidth: "1",
+      strokeDasharray: i === 0 || i === 4 ? "" : "2 4"
+    }
+  )), showSignal && /* @__PURE__ */ React.createElement(
+    "path",
+    {
+      d: sigPath,
+      fill: "none",
+      stroke: signalColor,
+      strokeWidth: "3",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      style: { filter: "drop-shadow(0 1px 0 rgba(0,0,0,.04))" }
+    }
+  ), /* @__PURE__ */ React.createElement("path", { d: path, fill: "none", stroke: color, strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", opacity: showSignal ? 0.45 : 0.9 }), data.map((d, i) => /* @__PURE__ */ React.createElement("circle", { key: i, cx: sx(d.x), cy: sy(d.y), r: 2.5, fill: color, opacity: showSignal ? 0.55 : 0.9 })), /* @__PURE__ */ React.createElement("text", { x: pad.l, y: h - 6, fontSize: "10", fill: "var(--ink-4)", className: "mono" }, "t=0"), /* @__PURE__ */ React.createElement("text", { x: w - pad.r, y: h - 6, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, "t=", data.length - 1));
+};
+const CalibrationPlot = ({ buckets, w = 380, h = 380 }) => {
+  const pad = 44;
+  const sx = (p) => pad + p * (w - pad * 2);
+  const sy = (p) => h - pad - p * (h - pad * 2);
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("line", { x1: sx(t), x2: sx(t), y1: sy(0), y2: sy(1), stroke: "var(--line)", strokeDasharray: "2 4" }), /* @__PURE__ */ React.createElement("line", { x1: sx(0), x2: sx(1), y1: sy(t), y2: sy(t), stroke: "var(--line)", strokeDasharray: "2 4" }))), /* @__PURE__ */ React.createElement("line", { x1: sx(0), y1: sy(0), x2: sx(1), y2: sy(1), stroke: "var(--ink-4)", strokeWidth: "1.5", strokeDasharray: "4 5" }), /* @__PURE__ */ React.createElement("line", { x1: sx(0), y1: sy(0), x2: sx(1), y2: sy(0), stroke: "var(--ink)", strokeWidth: "1.5" }), /* @__PURE__ */ React.createElement("line", { x1: sx(0), y1: sy(0), x2: sx(0), y2: sy(1), stroke: "var(--ink)", strokeWidth: "1.5" }), (() => {
+    const pts = buckets.filter((b) => b.n > 0).map((b) => [sx(b.p), sy(b.freq)]);
+    if (pts.length < 2) return null;
+    return /* @__PURE__ */ React.createElement("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: "var(--signal)", strokeWidth: "2.5", opacity: ".75" });
+  })(), buckets.map((b, i) => b.n > 0 && /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("circle", { cx: sx(b.p), cy: sy(b.freq), r: 6 + Math.min(b.n, 8) * 1.5, fill: "var(--signal)", opacity: ".18" }), /* @__PURE__ */ React.createElement("circle", { cx: sx(b.p), cy: sy(b.freq), r: 5.5, fill: "var(--signal)", stroke: "#fff", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("text", { x: sx(b.p), y: sy(b.freq) - 12, fontSize: "10", fill: "var(--ink-2)", textAnchor: "middle", className: "mono" }, b.n))), /* @__PURE__ */ React.createElement("text", { x: sx(0.5), y: h - 8, textAnchor: "middle", fontSize: "12", fill: "var(--ink-3)" }, "your stated probability \u2192"), /* @__PURE__ */ React.createElement("text", { x: 12, y: sy(0.5), textAnchor: "middle", fontSize: "12", fill: "var(--ink-3)", transform: `rotate(-90 12 ${sy(0.5)})` }, "actual frequency \u2192"), /* @__PURE__ */ React.createElement("text", { x: sx(0.05), y: sy(0.95), fontSize: "10", fill: "var(--ink-4)", className: "mono" }, "under-confident"), /* @__PURE__ */ React.createElement("text", { x: sx(0.95), y: sy(0.08), fontSize: "10", fill: "var(--ink-4)", className: "mono", textAnchor: "end" }, "over-confident"));
+};
+const DotField = ({ rows = 20, cols = 20, classify, dotSize = 14, gap = 2, animate = false }) => {
+  const total = rows * cols;
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${cols}, ${dotSize}px)`, gap, padding: 6 } }, Array.from({ length: total }).map((_, i) => {
+    const c = classify(i);
+    const colors = {
+      well: "var(--line-2)",
+      sick: "var(--noise)",
+      tp: "var(--noise)",
+      fp: "var(--gold)",
+      fn: "var(--line-2)",
+      tn: "var(--bg-soft)",
+      neg: "var(--bg-soft)",
+      hit: "var(--leaf)",
+      miss: "var(--bg-soft)",
+      custom: c?.color || "var(--line-2)"
+    };
+    const cls = typeof c === "string" ? c : c?.type || "neg";
+    const color = c?.color || colors[cls];
+    return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+      width: dotSize,
+      height: dotSize,
+      borderRadius: "50%",
+      background: color,
+      border: cls === "tn" || cls === "neg" || cls === "miss" ? "1px solid var(--line-2)" : "none",
+      transition: animate ? `all .35s ease ${i * 4}ms` : "none"
+    } });
+  }));
+};
+const BrierHistory = ({ rounds, w = 480, h = 160 }) => {
+  if (rounds.length === 0) return null;
+  const pad = { l: 32, r: 14, t: 14, b: 24 };
+  const maxRounds = Math.max(rounds.length, 8);
+  const sx = (i) => pad.l + i / (maxRounds - 1) * (w - pad.l - pad.r);
+  const sy = (v) => pad.t + (1 - Math.min(v / 1, 1)) * (h - pad.t - pad.b);
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, /* @__PURE__ */ React.createElement("rect", { x: pad.l, y: sy(0.25), width: w - pad.l - pad.r, height: sy(0) - sy(0.25), fill: "var(--leaf-soft)", opacity: ".5" }), /* @__PURE__ */ React.createElement("rect", { x: pad.l, y: sy(0.5), width: w - pad.l - pad.r, height: sy(0.25) - sy(0.5), fill: "var(--gold-soft)", opacity: ".5" }), /* @__PURE__ */ React.createElement("rect", { x: pad.l, y: sy(1), width: w - pad.l - pad.r, height: sy(0.5) - sy(1), fill: "var(--noise-soft)", opacity: ".4" }), [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement("line", { key: i, x1: pad.l, x2: w - pad.r, y1: sy(t), y2: sy(t), stroke: "var(--line)", strokeDasharray: i === 0 ? "" : "2 4" })), rounds.map((r, i) => /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("line", { x1: sx(i), x2: sx(i), y1: sy(0), y2: sy(r.score), stroke: "var(--ink-3)", strokeWidth: "1", opacity: ".4" }), /* @__PURE__ */ React.createElement("circle", { cx: sx(i), cy: sy(r.score), r: 5, fill: r.score < 0.15 ? "var(--leaf)" : r.score < 0.3 ? "var(--gold)" : "var(--noise)", stroke: "#fff", strokeWidth: "2" }))), /* @__PURE__ */ React.createElement("text", { x: pad.l - 6, y: sy(0) + 3, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, "0"), /* @__PURE__ */ React.createElement("text", { x: pad.l - 6, y: sy(0.5) + 3, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, ".5"), /* @__PURE__ */ React.createElement("text", { x: pad.l - 6, y: sy(1) + 3, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, "1"));
+};
+const Histogram = ({ buckets, w = 520, h = 180, accent = "var(--signal)", highlight = null, truth = null, mean = null }) => {
+  const pad = { l: 14, r: 14, t: 14, b: 26 };
+  const maxC = Math.max(...buckets.map((b) => b.count), 1);
+  const bw = (w - pad.l - pad.r) / buckets.length;
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, buckets.map((b, i) => {
+    const bh = b.count / maxC * (h - pad.t - pad.b);
+    const x = pad.l + i * bw;
+    const y = h - pad.b - bh;
+    const isHi = highlight !== null && b.x0 <= highlight && highlight < b.x1;
+    return /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement(
+      "rect",
+      {
+        x: x + 1,
+        y,
+        width: bw - 2,
+        height: bh,
+        fill: isHi ? "var(--ink)" : accent,
+        opacity: isHi ? 1 : 0.68,
+        rx: "2"
+      }
+    ));
+  }), /* @__PURE__ */ React.createElement("line", { x1: pad.l, x2: w - pad.r, y1: h - pad.b, y2: h - pad.b, stroke: "var(--ink)", strokeWidth: "1.2" }), truth !== null && (() => {
+    const xv = pad.l + (truth - buckets[0].x0) / (buckets[buckets.length - 1].x1 - buckets[0].x0) * (w - pad.l - pad.r);
+    return /* @__PURE__ */ React.createElement("g", null, /* @__PURE__ */ React.createElement("line", { x1: xv, x2: xv, y1: pad.t, y2: h - pad.b + 6, stroke: "var(--noise-2)", strokeWidth: "2", strokeDasharray: "3 3" }), /* @__PURE__ */ React.createElement("text", { x: xv, y: pad.t + 10, textAnchor: "middle", fontSize: "11", fill: "var(--noise-2)", className: "mono" }, "truth"));
+  })(), mean !== null && (() => {
+    const xv = pad.l + (mean - buckets[0].x0) / (buckets[buckets.length - 1].x1 - buckets[0].x0) * (w - pad.l - pad.r);
+    return /* @__PURE__ */ React.createElement("g", null, /* @__PURE__ */ React.createElement("line", { x1: xv, x2: xv, y1: pad.t + 18, y2: h - pad.b + 6, stroke: "var(--signal)", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("text", { x: xv, y: pad.t + 28, textAnchor: "middle", fontSize: "11", fill: "var(--signal)", className: "mono" }, "mean"));
+  })());
+};
+const BeliefBar = ({ prior, posterior, label = "belief" }) => /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, label), /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--ink)" } }, Math.round(posterior * 100), "%")), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 18, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${posterior * 100}%`, background: "linear-gradient(90deg, var(--signal), var(--signal-2))", transition: "width .6s cubic-bezier(.2,.9,.3,1)" } }), prior != null && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: `${prior * 100}%`, top: -2, bottom: -2, width: 2, background: "var(--noise-2)" }, title: `Prior: ${Math.round(prior * 100)}%` })));
+Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries });
+
+</script>
+<script>
+const SignalRounds = [
+  { id: "s1", seed: 7, signal: "none", noise: 9, prompt: "Sales over the last 40 days", accept: "noise", truth: "There is no underlying trend. Every dot is pure noise around a flat mean.", tip: "Even random walks form patterns the brain mistakes for stories." },
+  { id: "s2", seed: 19, signal: "up", noise: 11, prompt: "Weekly active users since launch", accept: "signal", truth: "There IS a real upward trend (\u2248 +30 over the window), buried in noise.", tip: "Slow upward signals are hardest to spot when noise > signal." },
+  { id: "s3", seed: 31, signal: "step", noise: 7, prompt: "Defect rate after a process change", accept: "signal", truth: "A real step change happens at t\u224822. The mean shifts up.", tip: "Step changes are easier to test than slope changes \u2014 split before/after." },
+  { id: "s4", seed: 44, signal: "none", noise: 13, prompt: "Daily app rating (random sample)", accept: "noise", truth: `No signal. The eye picks out a "dip" and a "recovery" that aren't there.`, tip: "High noise + small sample = phantom narratives. Demand more data." },
+  { id: "s5", seed: 58, signal: "cycle", noise: 5, prompt: "Hourly checkout volume", accept: "signal", truth: "A real cyclical pattern (period \u2248 \xBD window). Real cycles repeat; noise doesn't.", tip: "Real cycles persist out-of-sample. Test the prediction, not the chart." }
+];
+const StationSignal = ({ onComplete, recordScore, difficulty = "regular" }) => {
+  const [round, setRound] = React.useState(0);
+  const [phase, setPhase] = React.useState("decide");
+  const [picks, setPicks] = React.useState([]);
+  const noiseMul = difficulty === "easy" ? 0.7 : difficulty === "hard" ? 1.4 : 1;
+  const cur = SignalRounds[round];
+  const data = React.useMemo(() => genSeries({ seed: cur.seed, n: 40, signal: cur.signal, noise: cur.noise * noiseMul, bias: 50 }), [cur, noiseMul]);
+  const choose = (choice) => {
+    const correct = choice === cur.accept;
+    setPicks([...picks, { id: cur.id, choice, correct }]);
+    setPhase("reveal");
+  };
+  const next = () => {
+    if (round + 1 >= SignalRounds.length) {
+      const correct = picks.filter((p) => p.correct).length;
+      recordScore("signal", { correct, total: SignalRounds.length });
+      onComplete();
+      return;
+    }
+    setRound(round + 1);
+    setPhase("decide");
+  };
+  const last = picks[picks.length - 1];
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: `Station 01 \xB7 Round ${round + 1} of ${SignalRounds.length}`, title: "Is this a real trend, or just noise?", accent: "var(--signal)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--ink-2)", fontSize: 15 } }, cur.prompt), /* @__PURE__ */ React.createElement(ProgressDots, { total: SignalRounds.length, current: round })), /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bg-soft)", borderRadius: 18, padding: "14px 16px 6px", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(TimeSeriesChart, { data, showSignal: phase === "reveal" })), phase === "decide" && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 22, display: "flex", gap: 12, justifyContent: "center" } }, /* @__PURE__ */ React.createElement(Button, { variant: "signal", size: "lg", onClick: () => choose("signal"), icon: /* @__PURE__ */ React.createElement(Dot, { c: "#fff" }) }, "Real signal"), /* @__PURE__ */ React.createElement(Button, { variant: "noise", size: "lg", onClick: () => choose("noise"), icon: /* @__PURE__ */ React.createElement(Wave, { c: "#fff" }) }, "Just noise")), phase === "reveal" && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { marginTop: 18 } }, /* @__PURE__ */ React.createElement(Callout, { tone: last.correct ? "good" : "noise", icon: last.correct ? "\u2713" : "\u2717" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 } }, /* @__PURE__ */ React.createElement("strong", { style: { fontSize: 15 } }, last.correct ? "Correct." : "Not quite."), /* @__PURE__ */ React.createElement(Stamp, { label: cur.accept === "signal" ? "signal present" : "no signal", tone: cur.accept === "signal" ? "good" : "gold" })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, cur.truth), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "var(--ink-3)", fontStyle: "italic" } }, cur.tip)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { color: "var(--ink-4)", fontSize: 12 } }, picks.filter((p) => p.correct).length, " / ", picks.length, " correct so far"), /* @__PURE__ */ React.createElement(Button, { onClick: next, size: "lg" }, round + 1 >= SignalRounds.length ? "Finish station \u2192" : "Next round \u2192"))));
+};
+const Dot = ({ c = "var(--ink)" }) => /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14" }, /* @__PURE__ */ React.createElement("circle", { cx: "7", cy: "7", r: "3.5", fill: c }));
+const Wave = ({ c = "var(--ink)" }) => /* @__PURE__ */ React.createElement("svg", { width: "18", height: "14", viewBox: "0 0 18 14" }, /* @__PURE__ */ React.createElement("path", { d: "M1 7 Q4 1 7 7 T13 7 T18 7", fill: "none", stroke: c, strokeWidth: "1.6", strokeLinecap: "round" }));
+const QuizQs = [
+  { q: "Which is larger by land area?", a: "Australia", b: "Greenland", answer: "a", note: "Australia (~7.7M km\xB2) is roughly 3.5\xD7 the size of Greenland (~2.2M km\xB2). The Mercator map projection inflates Greenland enormously, which fools most people." },
+  { q: "Which has a larger population?", a: "California", b: "Canada", answer: "b", note: "Canada ~40M, California ~39M. Very close \u2014 a high-confidence pick is overconfidence." },
+  { q: "Which is taller?", a: "Mt. Kilimanjaro", b: "Mt. McKinley (Denali)", answer: "b", note: "Denali is 6,190m; Kilimanjaro is 5,895m. Close, but Denali wins." },
+  { q: "Which element is more abundant in Earth's crust?", a: "Iron", b: "Oxygen", answer: "b", note: "Oxygen (~46%) dominates the crust by mass. Iron is only ~5%." },
+  { q: "Which has more native speakers?", a: "Spanish", b: "English", answer: "a", note: "Spanish native speakers (~485M) outnumber English natives (~380M). English wins on total speakers when you add second-language." },
+  { q: "Which year was the modern Eiffel Tower completed?", a: "1879", b: "1889", answer: "b", note: "1889, for the World's Fair marking the centennial of the French Revolution." },
+  { q: "Which is heavier?", a: "A cubic meter of dry pine wood", b: "A cubic meter of saltwater", answer: "b", note: "Saltwater \u2248 1,025 kg/m\xB3 vs pine \u2248 500 kg/m\xB3. Saltwater is denser than fresh AND most softwoods." },
+  { q: "Which planet has more moons (known, as of recent counts)?", a: "Jupiter", b: "Saturn", answer: "b", note: "Saturn took the lead \u2014 140+ confirmed moons compared to Jupiter's 95-ish." }
+];
+const bucketize = (entries) => {
+  const edges = [[50, 60], [60, 70], [70, 80], [80, 90], [90, 101]];
+  return edges.map(([lo, hi]) => {
+    const items = entries.filter((e) => e.conf >= lo && e.conf < hi);
+    const mid = (lo + Math.min(hi, 100)) / 2;
+    return { p: mid / 100, n: items.length, freq: items.length ? items.filter((x) => x.correct).length / items.length : 0, range: `${lo}\u2013${Math.min(hi - 1, 100)}` };
+  });
+};
+const StationCalibration = ({ onComplete, recordScore }) => {
+  const [idx, setIdx] = React.useState(0);
+  const [pick, setPick] = React.useState(null);
+  const [conf, setConf] = React.useState(50);
+  const [phase, setPhase] = React.useState("answer");
+  const [log, setLog] = React.useState([]);
+  const cur = QuizQs[idx];
+  const submit = () => {
+    const correct = pick === cur.answer;
+    const entry = { q: cur.q, pick, correct, conf };
+    setLog([...log, entry]);
+    setPhase("reveal");
+  };
+  const next = () => {
+    if (idx + 1 >= QuizQs.length) {
+      const allEntries = log;
+      const buckets = bucketize(allEntries);
+      const correctCount = allEntries.filter((e) => e.correct).length;
+      recordScore("calibration", { buckets, correct: correctCount, total: QuizQs.length, log: allEntries });
+      setPhase("done");
+      return;
+    }
+    setIdx(idx + 1);
+    setPick(null);
+    setConf(50);
+    setPhase("answer");
+  };
+  if (phase === "done") {
+    const finalLog = log;
+    const buckets = bucketize(finalLog);
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Station 02", title: "Your calibration curve", accent: "var(--signal)" }, /* @__PURE__ */ React.createElement("p", { style: { color: "var(--ink-2)", marginTop: 0 } }, "For each confidence level you used, here's how often you were actually right. The dashed line is perfect calibration. ", /* @__PURE__ */ React.createElement("strong", null, "Below the line = overconfidence.")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1.1fr .9fr", gap: 24, alignItems: "center", marginTop: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bg-soft)", borderRadius: 18, padding: 14, border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(CalibrationPlot, { buckets })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Score", value: `${finalLog.filter((e) => e.correct).length}/${finalLog.length}`, sub: "raw accuracy" }), /* @__PURE__ */ React.createElement(Stat, { label: "Avg. confidence", value: `${Math.round(finalLog.reduce((s, e) => s + e.conf, 0) / finalLog.length)}%` }), /* @__PURE__ */ React.createElement(Stat, { label: "Actual accuracy", value: `${Math.round(finalLog.filter((e) => e.correct).length / finalLog.length * 100)}%`, tone: Math.abs(finalLog.reduce((s, e) => s + e.conf, 0) / finalLog.length - finalLog.filter((e) => e.correct).length / finalLog.length * 100) > 10 ? "bad" : "good", sub: "should match avg. confidence" }), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25D4" }, "A well-calibrated forecaster's average confidence equals their accuracy. Most people sit 10\u201320 points overconfident on their first try."), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "!" }, "Only ", finalLog.length, " questions here, so each bucket holds just a handful of answers \u2014 a single lucky or unlucky call swings a point a long way. Treat this as a rough sketch of your calibration, not a verdict. Real calibration needs dozens of forecasts."))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { onClick: onComplete, size: "lg" }, "Finish station \u2192")));
+  }
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: `Station 02 \xB7 Question ${idx + 1}/${QuizQs.length}`, title: cur.q, accent: "var(--signal)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(ProgressDots, { total: QuizQs.length, current: idx })), phase === "answer" && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, ["a", "b"].map((k) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: k,
+      className: "btn",
+      onClick: () => {
+        setPick(k);
+        setPhase("confidence");
+      },
+      style: {
+        padding: "24px 22px",
+        textAlign: "left",
+        borderRadius: 18,
+        background: "var(--bg-card)",
+        border: "2px solid var(--line)",
+        fontSize: 18,
+        color: "var(--ink)",
+        boxShadow: "var(--shadow-sm)"
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", letterSpacing: ".15em", textTransform: "uppercase", marginBottom: 8 } }, "option ", k),
+    /* @__PURE__ */ React.createElement("span", { className: "serif", style: { fontSize: 22, fontWeight: 500 } }, cur[k])
+  ))), phase === "confidence" && /* @__PURE__ */ React.createElement("div", { className: "fadeup" }, /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 22px", borderRadius: 18, background: "var(--bg-soft)", border: "1px solid var(--line)", marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", letterSpacing: ".15em", textTransform: "uppercase", marginBottom: 6 } }, "Your pick"), /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 22 } }, cur[pick])), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14, color: "var(--ink-2)" } }, "How confident are you that this pick is right? You already chose the option you think is more likely, so this runs from a coin-flip (50%) up to certain (100%)."), /* @__PURE__ */ React.createElement(ConfidenceSlider, { value: conf, onChange: setConf, min: 50 }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 26 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--ink-3)", fontSize: 13, maxWidth: 440 } }, conf < 55 ? "Basically a coin flip \u2014 you barely favour this option." : conf < 70 ? "A modest lean \u2014 you\u2019d still expect to be wrong fairly often." : conf < 85 ? "Confident \u2014 you\u2019d bet money on it." : conf < 97 ? "Very confident \u2014 you\u2019d bet a lot." : "Near-certain \u2014 you\u2019d stake almost anything."), /* @__PURE__ */ React.createElement(Button, { onClick: submit, size: "lg" }, "Lock in \u2192"))), phase === "reveal" && (() => {
+    const last = log[log.length - 1];
+    return /* @__PURE__ */ React.createElement("div", { className: "fadeup" }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 } }, ["a", "b"].map((k) => /* @__PURE__ */ React.createElement("div", { key: k, style: {
+      padding: "22px 22px",
+      borderRadius: 18,
+      background: k === cur.answer ? "var(--leaf-soft)" : k === pick ? "var(--noise-soft)" : "var(--bg-soft)",
+      border: `2px solid ${k === cur.answer ? "var(--leaf)" : k === pick ? "var(--noise)" : "var(--line)"}`,
+      opacity: k === cur.answer || k === pick ? 1 : 0.6
+    } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-3)", letterSpacing: ".15em", textTransform: "uppercase", marginBottom: 8, display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", null, "option ", k), k === cur.answer && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--good)" } }, "truth"), k === pick && k !== cur.answer && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--bad)" } }, "your pick")), /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 20 } }, cur[k])))), /* @__PURE__ */ React.createElement(Callout, { tone: last.correct ? "good" : "noise", icon: last.correct ? "\u2713" : "\u2717" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 } }, /* @__PURE__ */ React.createElement("strong", null, last.correct ? `Right \u2014 at ${last.conf}% confidence` : `Wrong \u2014 and you were ${last.conf}% sure`)), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, cur.note)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { onClick: next, size: "lg" }, idx + 1 >= QuizQs.length ? "See your calibration \u2192" : "Next question \u2192")));
+  })());
+};
+const BrierEvents = [
+  {
+    id: "b1",
+    q: "The next single roll of a fair six-sided die is a 6.",
+    truth: false,
+    optimal: 1 / 6,
+    context: [
+      { kind: "physical", text: "The die is fair: six faces, equal weight." },
+      { kind: "reference", text: "A 6 is one of six equally likely outcomes." }
+    ],
+    lesson: "When outcomes are equally likely and there's no extra info, the optimal forecast is just 1/N. Here, 1/6 \u2248 17%."
+  },
+  {
+    id: "b2",
+    q: "Tomorrow is a rainy day in Seattle.",
+    when: "A random November day",
+    truth: true,
+    optimal: 0.58,
+    context: [
+      { kind: "analogy", text: "Of the last 10 Novembers in Seattle, between 16 and 21 days were rainy each year." },
+      { kind: "data", text: "The previous 3 days were rainy; a low-pressure system is moving in." },
+      { kind: "note", text: "No official meteorologist forecast is provided." }
+    ],
+    lesson: "You should have lived around 55\u201365%. Strong climatological signal \u2014 but never override real weather data with a flat rate."
+  },
+  {
+    id: "b3",
+    q: "This specific seed-stage startup, founded by two ex-Google engineers, reaches a $1B valuation within 10 years.",
+    truth: false,
+    optimal: 0.08,
+    context: [
+      { kind: "reference", text: "Of every 100 venture-backed startups in this category, roughly 5\u201310 reach unicorn status within a decade." },
+      { kind: "analogy", text: "Founders with FAANG backgrounds have historically had slightly above-average outcomes \u2014 about 1.5\xD7 the baseline." },
+      { kind: "data", text: "The startup has paying customers but no product-market fit signal yet." }
+    ],
+    lesson: "Even strong-on-paper startups rarely reach unicorn status. Around 7\u201310% is justified \u2014 anything above ~15% is wishful."
+  },
+  {
+    id: "b4",
+    q: "A randomly chosen S&P 500 stock has a positive total return over the next 12 months.",
+    truth: true,
+    optimal: 0.66,
+    context: [
+      { kind: "reference", text: "Across all 12-month windows in the index's history, the median stock posted a positive return roughly two-thirds of the time." },
+      { kind: "data", text: "Current macro: moderate growth, no recession signal in PMI or yield curve." },
+      { kind: "analogy", text: "In comparable periods (post-pause Fed cycles), positive-return rates ran ~60\u201370%." }
+    ],
+    lesson: 'The truth is around 65\u201370%. Investors who reflexively say "stocks go up 50% of the time" are systematically underconfident.'
+  },
+  {
+    id: "b5",
+    q: "A US federal criminal case that actually goes to trial (rare!) ends in a conviction.",
+    truth: true,
+    optimal: 0.83,
+    context: [
+      { kind: "reference", text: "Most US federal cases are resolved by plea bargain. The ones that reach trial are a small, filtered subset." },
+      { kind: "analogy", text: "Across DOJ annual reports, the trial-conviction figure has hovered in a tight band for a decade." },
+      { kind: "note", text: "Cases that reach trial are typically ones where the prosecution is most confident \u2014 selection effect." }
+    ],
+    lesson: "Once you account for the selection effect (only confident-prosecution cases go to trial), conviction probability is very high \u2014 80\u201385%."
+  },
+  {
+    id: "b6",
+    q: "A randomly chosen US adult, surveyed today, reports sleeping less than 6 hours last night.",
+    truth: false,
+    optimal: 0.16,
+    context: [
+      { kind: "reference", text: 'CDC surveys put "<7 hours of sleep" at about 1 in 3 US adults.' },
+      { kind: "analogy", text: "Shifting the threshold from <7 to <6 cuts the share by roughly half." },
+      { kind: "data", text: "No specific demographic skew applies to this random draw." }
+    ],
+    lesson: "<6 hours is roughly 14\u201318% of adults. Confusing it with the more familiar <7 stat (~33%) is the trap."
+  }
+];
+const ContextCard = ({ kind, text }) => {
+  const map = {
+    reference: { icon: "\u29D6", label: "reference class", tone: "signal" },
+    analogy: { icon: "\u2248", label: "historical analogy", tone: "gold" },
+    data: { icon: "\u25C6", label: "current data", tone: "leaf" },
+    physical: { icon: "\u25EF", label: "physical setup", tone: "signal" },
+    note: { icon: "!", label: "caveat", tone: "neutral" }
+  };
+  const m = map[kind] || map.note;
+  const tones = {
+    signal: { bg: "var(--signal-soft)", fg: "var(--signal)" },
+    gold: { bg: "var(--gold-soft)", fg: "var(--gold)" },
+    leaf: { bg: "var(--leaf-soft)", fg: "var(--leaf)" },
+    neutral: { bg: "var(--bg-soft)", fg: "var(--ink-3)" }
+  };
+  const c = tones[m.tone];
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, padding: "12px 14px", borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { flex: "0 0 28px", width: 28, height: 28, borderRadius: 8, background: c.bg, color: c.fg, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 } }, m.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 10.5, color: c.fg, textTransform: "uppercase", letterSpacing: ".14em", marginBottom: 2 } }, m.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, lineHeight: 1.45, color: "var(--ink-2)" } }, text)));
+};
+const StationBrier = ({ onComplete, recordScore }) => {
+  const [idx, setIdx] = React.useState(0);
+  const [prob, setProb] = React.useState(50);
+  const [phase, setPhase] = React.useState("predict");
+  const [rounds, setRounds] = React.useState([]);
+  const cur = BrierEvents[idx];
+  const submit = () => {
+    const p = prob / 100;
+    const outcome = cur.truth ? 1 : 0;
+    const score = Math.pow(p - outcome, 2);
+    const optimal = Math.pow(cur.optimal - outcome, 2);
+    setRounds([...rounds, { ...cur, p, outcome, score, optimal }]);
+    setPhase("reveal");
+  };
+  const next = () => {
+    if (idx + 1 >= BrierEvents.length) {
+      const avg = rounds.reduce((s, r) => s + r.score, 0) / rounds.length;
+      recordScore("brier", { avg, rounds });
+      onComplete();
+      return;
+    }
+    setIdx(idx + 1);
+    setProb(50);
+    setPhase("predict");
+  };
+  const avgSoFar = rounds.length ? rounds.reduce((s, r) => s + r.score, 0) / rounds.length : null;
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: `Station 03 \xB7 Event ${idx + 1}/${BrierEvents.length}`, title: "Will it happen?", accent: "var(--signal)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 14 } }, /* @__PURE__ */ React.createElement(ProgressDots, { total: BrierEvents.length, current: idx }), avgSoFar != null && /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 12, color: "var(--ink-3)" } }, "avg. Brier so far: ", /* @__PURE__ */ React.createElement("strong", { style: { color: "var(--ink)" } }, avgSoFar.toFixed(3)))), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 24px", borderRadius: 18, background: "var(--bg-soft)", border: "1px solid var(--line)", marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 22, lineHeight: 1.3, color: "var(--ink)" } }, cur.q), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginTop: 14 } }, cur.context.map((c, i) => /* @__PURE__ */ React.createElement(ContextCard, { key: i, kind: c.kind, text: c.text })))), phase === "predict" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12, color: "var(--ink-2)", fontSize: 14 } }, "Probability it happens?"), /* @__PURE__ */ React.createElement(ProbabilitySlider, { value: prob, onChange: setProb, lowLabel: "impossible", highLabel: "certain" }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 22 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 12, color: "var(--ink-4)" } }, "Brier = (prob \u2212 outcome)\xB2 \xB7 lower is better"), /* @__PURE__ */ React.createElement(Button, { onClick: submit, size: "lg" }, "Lock in \u2192"))), phase === "reveal" && (() => {
+    const last = rounds[rounds.length - 1];
+    const verdict = last.score < 0.15 ? "sharp" : last.score < 0.3 ? "okay" : "noisy";
+    const tone = last.score < 0.15 ? "good" : last.score < 0.3 ? "gold" : "noise";
+    return /* @__PURE__ */ React.createElement("div", { className: "fadeup" }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 20, alignItems: "center", padding: "18px 22px", borderRadius: 18, background: "var(--bg-card)", border: "1px solid var(--line-2)" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, "outcome"), /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 30, fontWeight: 600, color: last.outcome ? "var(--good)" : "var(--bad)" } }, last.outcome ? "Yes" : "No")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 18 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Your prob.", value: `${Math.round(last.p * 100)}%` }), /* @__PURE__ */ React.createElement(Stat, { label: "Brier score", value: last.score.toFixed(3), tone: tone === "good" ? "good" : tone === "noise" ? "bad" : "neutral" }), /* @__PURE__ */ React.createElement(Stat, { label: "Optimal was", value: `${Math.round(cur.optimal * 100)}%`, sub: "best inference from clues" })), /* @__PURE__ */ React.createElement(Stamp, { label: verdict, tone: tone === "good" ? "good" : tone === "noise" ? "bad" : "gold" })), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", lineHeight: 1.5, margin: "12px 2px 0" } }, 'The "optimal" forecast minimises your ', /* @__PURE__ */ React.createElement("em", null, "expected"), " Brier over many outcomes. On a single realised event, an overconfident call can occasionally score better by luck \u2014 the payoff is in being calibrated across a whole season of forecasts, not any one of them."), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25C6" }, cur.lesson), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 16, padding: "14px 16px", borderRadius: 14, background: "var(--bg-soft)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 } }, "your Brier history"), /* @__PURE__ */ React.createElement(BrierHistory, { rounds }), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { display: "flex", gap: 14, fontSize: 11, color: "var(--ink-3)", marginTop: 6 } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 9, height: 9, borderRadius: 9, background: "var(--leaf)" } }), " < 0.15 sharp"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 9, height: 9, borderRadius: 9, background: "var(--gold)" } }), " 0.15\u20130.3 ok"), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 9, height: 9, borderRadius: 9, background: "var(--noise)" } }), " > 0.3 noisy"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { onClick: next, size: "lg" }, idx + 1 >= BrierEvents.length ? "Finish station \u2192" : "Next event \u2192")));
+  })());
+};
+const StationBaseRate = ({ onComplete, recordScore }) => {
+  const prevalence = 0.01;
+  const sensitivity = 0.99;
+  const specificity = 0.95;
+  const N = 1e4;
+  const sick = Math.round(N * prevalence);
+  const truePos = Math.round(sick * sensitivity);
+  const falsePos = Math.round((N - sick) * (1 - specificity));
+  const ppv = truePos / (truePos + falsePos);
+  const [guess, setGuess] = React.useState(75);
+  const [phase, setPhase] = React.useState("guess");
+  const [revealed, setRevealed] = React.useState(false);
+  const submit = () => {
+    setPhase("step1");
+    setTimeout(() => setRevealed(true), 60);
+  };
+  const classify = (i) => {
+    if (i < sick) return i < truePos ? "tp" : "fn";
+    const j = i - sick;
+    return j < falsePos ? "fp" : "tn";
+  };
+  const classifyPhase = (i) => {
+    if (phase === "guess" || phase === "step1") {
+      return i < sick ? "sick" : "well";
+    }
+    if (phase === "step2") {
+      const c2 = classify(i);
+      if (c2 === "tp") return "tp";
+      if (c2 === "fp") return "fp";
+      if (c2 === "fn") return "sick";
+      return "well";
+    }
+    const c = classify(i);
+    if (c === "tp") return "tp";
+    if (c === "fp") return "fp";
+    return "neg";
+  };
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Station 04", title: "A 99%-accurate test came back positive.", accent: "var(--signal)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "\u2695" }, "A rare disease affects ", /* @__PURE__ */ React.createElement("strong", null, "1 in 100"), " people. The test catches ", /* @__PURE__ */ React.createElement("strong", null, "99%"), " of true cases. The test gives a ", /* @__PURE__ */ React.createElement("strong", null, "5%"), " false-positive rate on healthy people. ", /* @__PURE__ */ React.createElement("br", null), "Your test came back ", /* @__PURE__ */ React.createElement("strong", { style: { color: "var(--noise-2)" } }, "positive"), ". What's the chance you actually have the disease?"), phase === "guess" && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 22 } }, /* @__PURE__ */ React.createElement(ProbabilitySlider, { value: guess, onChange: setGuess, lowLabel: "0%", highLabel: "100%" }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--ink-3)", fontSize: 13 } }, guess > 75 ? "Most people guess somewhere here." : guess > 40 ? "A reasonable gut answer." : "Closer to the truth than you might think..."), /* @__PURE__ */ React.createElement(Button, { onClick: submit, size: "lg" }, "Reveal \u2192"))), phase !== "guess" && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { marginTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "auto 1fr", gap: 24, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bg-soft)", borderRadius: 18, padding: 14, border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(DotField, { rows: 50, cols: 50, dotSize: 8, gap: 1, animate: true, classify: (i) => classifyPhase(i) }), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textAlign: "center", marginTop: 8 } }, "10,000 people from the population")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 4 } }, "step ", phase === "step1" ? "1" : phase === "step2" ? "2" : "3", " / 3"), /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 22, color: "var(--ink)", lineHeight: 1.25 } }, phase === "step1" && "Out of 10,000 people, only 100 are actually sick.", phase === "step2" && "The test flags 99 sick people \u2014 and 495 healthy ones.", phase === "step3" && "Of all positive tests, only ~17% are real.")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px", borderRadius: 12, background: "var(--noise-soft)", border: "1px solid var(--noise)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--noise-2)", textTransform: "uppercase", letterSpacing: ".12em" } }, "true positives"), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--noise-2)" } }, truePos)), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 14px", borderRadius: 12, background: "var(--gold-soft)", border: "1px solid var(--gold)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: ".12em" } }, "false positives"), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--gold)" } }, falsePos))), phase === "step3" && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { padding: "18px 20px", borderRadius: 14, background: "var(--bg-card)", border: "1.5px solid var(--ink)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, "real probability you have it"), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 42, fontWeight: 600, color: "var(--ink)" } }, Math.round(ppv * 100), "%"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--ink-3)", marginTop: 4 } }, "You guessed ", guess, "% \xB7 gap of ", Math.abs(guess - Math.round(ppv * 100)), " points")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" } }, phase === "step1" && /* @__PURE__ */ React.createElement(Button, { onClick: () => setPhase("step2") }, "Show test results \u2192"), phase === "step2" && /* @__PURE__ */ React.createElement(Button, { onClick: () => setPhase("step3") }, "Compute the answer \u2192"), phase === "step3" && /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => {
+    recordScore("baseRate", { guess, truth: Math.round(ppv * 100) });
+    onComplete();
+  } }, "Finish station \u2192")))), phase === "step3" && /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u2234" }, /* @__PURE__ */ React.createElement("strong", null, "Base rates dominate."), " When the prior is tiny (1%), even an accurate-sounding test produces mostly false alarms. A positive result is evidence, but it doesn't override a strong prior \u2014 it updates it.")));
+};
+const BayesScenarios = [
+  {
+    title: "Will this new hire be a top performer?",
+    context: "Base rate: roughly 20% of new hires turn out to be top performers in their first year.",
+    prior: 0.2,
+    evidence: [
+      { id: "a", label: "Stanford CS degree", direction: "pos", lr: 1.6, note: "Modest positive signal \u2014 prestige correlates with performance, but weakly." },
+      { id: "b", label: "Bombed the live coding question", direction: "neg", lr: 0.5, note: "Real but noisy negative \u2014 some great hires panic in interviews." },
+      { id: "c", label: "Glowing reference from trusted ex-colleague", direction: "pos", lr: 3, note: "Strong positive \u2014 references from people who have skin in the game are predictive." },
+      { id: "d", label: "Asked one of the best questions we've ever heard", direction: "pos", lr: 2.2, note: "Quality of questions is a strong signal of judgment." },
+      { id: "e", label: "Has been at 4 jobs in 5 years", direction: "neg", lr: 0.55, note: "Negative for tenure, but the modern job market makes this noisier than it used to be." },
+      { id: "f", label: "Salary expectations 40% above band", direction: "neg", lr: 0.7, note: "Weak negative \u2014 could mean overpriced, or just well-calibrated to their value." }
+    ]
+  },
+  {
+    title: "Will this A/B test variant win when fully rolled out?",
+    context: "Base rate: ~12% of A/B test variants ship as winners at our company.",
+    prior: 0.12,
+    evidence: [
+      { id: "a", label: "Variant is significantly better at p < 0.05 in first day", direction: "pos", lr: 2, note: "Early significance is noisy \u2014 peeking inflates false positives." },
+      { id: "b", label: "Effect is consistent across 3 segments", direction: "pos", lr: 2.4, note: "Multi-segment consistency is much harder to fake than a single significant result." },
+      { id: "c", label: "No theoretical reason the change should help", direction: "neg", lr: 0.6, note: "Atheoretical wins regress to the mean. Theory is your friend." },
+      { id: "d", label: "Test was scoped to 1 week (short)", direction: "neg", lr: 0.7, note: "Short tests miss novelty effects and weekly cycles." },
+      { id: "e", label: "Similar change won at a peer company", direction: "pos", lr: 1.8, note: "Borrowed evidence is real evidence \u2014 base rates compound." },
+      { id: "f", label: "Implementation has a subtle bug favoring variant", direction: "neg", lr: 0.2, note: "Catastrophic \u2014 invalidates the test entirely." }
+    ]
+  }
+];
+const StationBayes = ({ onComplete, recordScore, scenarioIdx = 0 }) => {
+  const scenario = BayesScenarios[scenarioIdx];
+  const allIds = scenario.evidence.map((e) => e.id);
+  const [applied, setApplied] = React.useState([]);
+  const [phase, setPhase] = React.useState("explore");
+  const [estimate, setEstimate] = React.useState(50);
+  const posterior = React.useMemo(() => {
+    let odds = scenario.prior / (1 - scenario.prior);
+    for (const id of applied) {
+      const ev = scenario.evidence.find((e) => e.id === id);
+      if (ev) odds *= ev.lr;
+    }
+    return odds / (1 + odds);
+  }, [applied, scenario]);
+  const toggle = (id) => {
+    if (phase !== "explore") return;
+    setApplied(applied.includes(id) ? applied.filter((x) => x !== id) : [...applied, id]);
+  };
+  const startAssess = () => {
+    setApplied(allIds);
+    setEstimate(Math.round(scenario.prior * 100));
+    setPhase("assess");
+  };
+  const submitEstimate = () => {
+    const gap2 = Math.abs(estimate / 100 - posterior);
+    recordScore("bayes", { posterior, applied: allIds.length, estimate: estimate / 100, gap: gap2 });
+    setPhase("reveal");
+  };
+  const hidePosterior = phase === "assess";
+  const gap = Math.abs(estimate / 100 - posterior);
+  const gapPts = Math.round(gap * 100);
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Station 05", title: scenario.title, accent: "var(--signal)" }, /* @__PURE__ */ React.createElement("div", { style: { color: "var(--ink-2)", marginBottom: 18 } }, scenario.context), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "22px", borderRadius: 18, background: "var(--bg-soft)", border: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 18 } }, hidePosterior ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline" } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, "your current belief"), /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--ink-4)" } }, "? %")) : /* @__PURE__ */ React.createElement(BeliefBar, { prior: scenario.prior, posterior, label: "your current belief" }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 240, marginTop: 10 } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 200 240", width: "100%", height: "100%", style: { display: "block" } }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("clipPath", { id: "beakerClip" }, /* @__PURE__ */ React.createElement("path", { d: "M 50 20 L 50 200 Q 50 230 80 230 L 120 230 Q 150 230 150 200 L 150 20 Z" })), /* @__PURE__ */ React.createElement("linearGradient", { id: "liquid", x1: "0", x2: "0", y1: "0", y2: "1" }, /* @__PURE__ */ React.createElement("stop", { offset: "0", stopColor: "var(--signal-2)", stopOpacity: ".95" }), /* @__PURE__ */ React.createElement("stop", { offset: "1", stopColor: "var(--signal)", stopOpacity: "1" }))), /* @__PURE__ */ React.createElement("line", { x1: "46", x2: "154", y1: 230 - scenario.prior * 210, y2: 230 - scenario.prior * 210, stroke: "var(--noise-2)", strokeWidth: "1.5", strokeDasharray: "3 3" }), /* @__PURE__ */ React.createElement("text", { x: "158", y: 230 - scenario.prior * 210 + 4, fontSize: "10", fill: "var(--noise-2)", className: "mono" }, "prior ", Math.round(scenario.prior * 100), "%"), !hidePosterior && /* @__PURE__ */ React.createElement(
+    "rect",
+    {
+      x: "40",
+      y: 230 - posterior * 210,
+      width: "120",
+      height: posterior * 210,
+      fill: "url(#liquid)",
+      clipPath: "url(#beakerClip)",
+      style: { transition: "all .65s cubic-bezier(.2,.9,.3,1)" }
+    }
+  ), hidePosterior && /* @__PURE__ */ React.createElement("text", { x: "100", y: "130", textAnchor: "middle", fontSize: "52", fill: "var(--ink-4)", className: "serif" }, "?"), /* @__PURE__ */ React.createElement(
+    "path",
+    {
+      d: "M 50 20 L 50 200 Q 50 230 80 230 L 120 230 Q 150 230 150 200 L 150 20",
+      fill: "none",
+      stroke: "var(--ink)",
+      strokeWidth: "2.5",
+      strokeLinecap: "round"
+    }
+  ), /* @__PURE__ */ React.createElement("line", { x1: "40", x2: "50", y1: "20", y2: "20", stroke: "var(--ink)", strokeWidth: "2.5" }), /* @__PURE__ */ React.createElement("line", { x1: "150", x2: "160", y1: "20", y2: "20", stroke: "var(--ink)", strokeWidth: "2.5" }), [0, 0.25, 0.5, 0.75, 1].map((t) => /* @__PURE__ */ React.createElement("g", { key: t }, /* @__PURE__ */ React.createElement("line", { x1: "50", x2: "58", y1: 230 - t * 210, y2: 230 - t * 210, stroke: "var(--ink-3)", strokeWidth: "1" }), /* @__PURE__ */ React.createElement("text", { x: "40", y: 230 - t * 210 + 3, fontSize: "9", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, Math.round(t * 100)))), phase === "reveal" && /* @__PURE__ */ React.createElement("g", null, /* @__PURE__ */ React.createElement("line", { x1: "40", x2: "160", y1: 230 - estimate / 100 * 210, y2: 230 - estimate / 100 * 210, stroke: "var(--gold)", strokeWidth: "2", strokeDasharray: "4 3" }), /* @__PURE__ */ React.createElement("text", { x: "100", y: 230 - estimate / 100 * 210 - 5, fontSize: "10", fill: "var(--gold)", textAnchor: "middle", className: "mono" }, "you: ", estimate, "%")))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement(Stat, { label: "prior", value: `${Math.round(scenario.prior * 100)}%` }), /* @__PURE__ */ React.createElement(Stat, { label: "posterior", value: hidePosterior ? "?" : `${Math.round(posterior * 100)}%`, tone: "signal" }), /* @__PURE__ */ React.createElement(Stat, { label: "evidence in play", value: `${applied.length}/${scenario.evidence.length}` }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 10 } }, phase === "explore" ? "Click to add or remove evidence" : "All evidence in play (locked)"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, scenario.evidence.map((ev) => {
+    const on = applied.includes(ev.id);
+    const pos = ev.direction === "pos";
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: ev.id,
+        className: "btn",
+        onClick: () => toggle(ev.id),
+        style: {
+          textAlign: "left",
+          padding: "14px 16px",
+          borderRadius: 14,
+          cursor: phase === "explore" ? "pointer" : "default",
+          background: on ? pos ? "var(--leaf-soft)" : "var(--noise-soft)" : "var(--bg-card)",
+          border: `1.5px solid ${on ? pos ? "var(--leaf)" : "var(--noise)" : "var(--line-2)"}`,
+          boxShadow: "var(--shadow-sm)"
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14.5, fontWeight: 500, color: "var(--ink)" } }, ev.label), /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 12, padding: "3px 8px", borderRadius: 999, color: pos ? "var(--good)" : "var(--bad)", background: "var(--bg-card)", border: `1px solid ${pos ? "var(--leaf)" : "var(--noise)"}` } }, "\xD7", ev.lr.toFixed(1), " odds")),
+      on && phase !== "assess" && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { marginTop: 6, fontSize: 12.5, color: "var(--ink-3)", fontStyle: "italic" } }, ev.note)
+    );
+  })))), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25D1" }, "Bayes' rule in plain English: ", /* @__PURE__ */ React.createElement("strong", null, "your new odds = old odds \xD7 likelihood ratio"), ". Each piece of evidence multiplies, it doesn't add. Strong priors are hard to move; weak priors flip easily."), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "!" }, /* @__PURE__ */ React.createElement("strong", null, "Independence assumption."), " Multiplying these likelihood ratios together assumes each clue is ", /* @__PURE__ */ React.createElement("em", null, "conditionally independent"), ' given the outcome. Real clues overlap \u2014 a Stanford degree and a brilliant question both proxy "smart" \u2014 so multiplying naively double-counts and overstates the update. Treat the beaker as an upper bound on how far the evidence should really move you.'), phase === "explore" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, gap: 16, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13.5, color: "var(--ink-3)", maxWidth: 520 } }, "Experiment freely: toggle clues on and off and watch the belief move. When you're ready, we'll lock in all the evidence, hide the answer, and ask you to predict the posterior."), /* @__PURE__ */ React.createElement(Button, { onClick: startAssess, size: "lg" }, "Quiz me: predict the posterior \u2192")), phase === "assess" && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { marginTop: 18, padding: "20px 22px", borderRadius: 18, background: "var(--bg-card)", border: "1.5px solid var(--line-2)" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12, color: "var(--ink-2)", fontSize: 15 } }, "All six clues are now in play. Starting from the ", /* @__PURE__ */ React.createElement("strong", null, Math.round(scenario.prior * 100), "% prior"), " and multiplying by every likelihood ratio, ", /* @__PURE__ */ React.createElement("strong", null, "where does your belief end up?")), /* @__PURE__ */ React.createElement(ProbabilitySlider, { value: estimate, onChange: setEstimate, lowLabel: "0%", highLabel: "100%" }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 22 } }, /* @__PURE__ */ React.createElement(Button, { onClick: submitEstimate, size: "lg" }, "Reveal the true posterior \u2192"))), phase === "reveal" && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { marginTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "You predicted", value: `${estimate}%` }), /* @__PURE__ */ React.createElement(Stat, { label: "True posterior", value: `${Math.round(posterior * 100)}%`, tone: "signal" }), /* @__PURE__ */ React.createElement(Stat, { label: "Gap", value: `${gapPts} pts`, tone: gap < 0.08 ? "good" : gap < 0.18 ? "neutral" : "bad" })), /* @__PURE__ */ React.createElement(Callout, { tone: gap < 0.08 ? "good" : gap < 0.18 ? "gold" : "noise", icon: gap < 0.08 ? "\u2713" : gap < 0.18 ? "\u2248" : "\u2717" }, gap < 0.08 ? "Sharp. You tracked the odds-multiplication closely \u2014 that's exactly the Bayesian instinct." : gap < 0.18 ? "Close. You had the right direction; the exact magnitude of a multiplicative update is famously hard to eyeball." : estimate / 100 > posterior ? "You over-shot. Piling positive clues together feels convincing, but a modest prior and a couple of negatives pull the posterior back down harder than intuition expects." : "You under-shot. Strong positive likelihood ratios compound faster than addition \u2014 a chain of good signals moves belief further than it feels like it should."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { onClick: onComplete, size: "lg" }, "Finish station \u2192"))));
+};
+const generateCrowd = (truth, n = 400, seed = 42, biasFactor = 0.85, spread = 0.35) => {
+  const rng = mulberry32(seed);
+  const guesses = [];
+  for (let i = 0; i < n; i++) {
+    const bias = truth * biasFactor;
+    const sd = truth * spread;
+    const g = bias + gauss(rng) * sd;
+    guesses.push(Math.max(0, Math.round(g)));
+  }
+  return guesses;
+};
+const StationCrowd = ({ onComplete, recordScore }) => {
+  const TRUTH = 1247;
+  const CROWD_SEED = 91;
+  const [low, setLow] = React.useState(800);
+  const [mid, setMid] = React.useState(1e3);
+  const [high, setHigh] = React.useState(1500);
+  const [phase, setPhase] = React.useState("guess");
+  const crowd = React.useMemo(() => generateCrowd(TRUTH, 600, CROWD_SEED, 0.82, 0.32), []);
+  const median = React.useMemo(() => {
+    const s = [...crowd].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  }, [crowd]);
+  const mean = React.useMemo(() => Math.round(crowd.reduce((a, b) => a + b, 0) / crowd.length), [crowd]);
+  const buckets = React.useMemo(() => {
+    const min = Math.min(...crowd, TRUTH * 0.3);
+    const max = Math.max(...crowd, TRUTH * 1.6);
+    const span = max - min;
+    const nB = 28;
+    const w = span / nB;
+    const bs = Array.from({ length: nB }).map((_, i) => ({ x0: min + i * w, x1: min + (i + 1) * w, count: 0 }));
+    crowd.forEach((g) => {
+      const idx = Math.min(nB - 1, Math.floor((g - min) / w));
+      if (idx >= 0) bs[idx].count++;
+    });
+    return bs;
+  }, [crowd]);
+  const inCI = TRUTH >= low && TRUTH <= high;
+  const hitMid = Math.abs(mid - TRUTH) < Math.abs(median - TRUTH);
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Station 06", title: "How many jelly beans in the jar?", accent: "var(--signal)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: ".85fr 1.15fr", gap: 24, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "22px", borderRadius: 18, background: "var(--bg-soft)", border: "1px solid var(--line)", textAlign: "center" } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 200 240", width: "180", style: { display: "block", margin: "0 auto" } }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("clipPath", { id: "jarClip" }, /* @__PURE__ */ React.createElement("path", { d: "M 50 40 L 50 200 Q 50 225 80 225 L 120 225 Q 150 225 150 200 L 150 40 Q 150 30 140 30 L 60 30 Q 50 30 50 40 Z" }))), /* @__PURE__ */ React.createElement("g", { clipPath: "url(#jarClip)" }, Array.from({ length: 140 }).map((_, i) => {
+    const r = mulberry32(i + 1)();
+    const r2 = mulberry32(i + 999)();
+    const x = 55 + r * 90;
+    const y = 50 + r2 * 170;
+    const hue = ["#E66B3D", "#1E5F70", "#C99425", "#5A7A3D", "#B6402A"][Math.floor(mulberry32(i + 7)() * 5)];
+    return /* @__PURE__ */ React.createElement("ellipse", { key: i, cx: x, cy: y, rx: "6.5", ry: "4.5", fill: hue, opacity: ".78", transform: `rotate(${mulberry32(i + 11)() * 180} ${x} ${y})` });
+  })), /* @__PURE__ */ React.createElement("path", { d: "M 50 40 L 50 200 Q 50 225 80 225 L 120 225 Q 150 225 150 200 L 150 40", fill: "none", stroke: "var(--ink)", strokeWidth: "2.5" }), /* @__PURE__ */ React.createElement("path", { d: "M 45 28 L 155 28 Q 162 28 162 35 L 162 42 Q 162 49 155 49 L 45 49 Q 38 49 38 42 L 38 35 Q 38 28 45 28 Z", fill: "var(--gold-soft)", stroke: "var(--ink)", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("text", { x: "100", y: "44", textAnchor: "middle", fontSize: "11", fill: "var(--ink-2)", className: "mono", fontWeight: "600" }, "GUESS THE COUNT"))), /* @__PURE__ */ React.createElement("div", null, phase === "guess" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { marginTop: 0, color: "var(--ink-2)" } }, "Give a ", /* @__PURE__ */ React.createElement("strong", null, "90% confidence interval"), " \u2014 a range you're 90% sure contains the true count \u2014 and your best single guess."), /* @__PURE__ */ React.createElement(
+    CIInput,
+    {
+      low,
+      mid,
+      high,
+      min: 100,
+      max: 3e3,
+      onChange: ({ low: low2, mid: mid2, high: high2 }) => {
+        setLow(low2);
+        setMid(mid2);
+        setHigh(high2);
+      }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--ink-3)" } }, "If you're well calibrated, the truth lands in your interval ~9 times out of 10."), /* @__PURE__ */ React.createElement(Button, { onClick: () => setPhase("reveal"), size: "lg" }, "Reveal the crowd \u2192"))), phase === "reveal" && /* @__PURE__ */ React.createElement("div", { className: "fadeup" }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 6 } }, "A simulated crowd of 600 guesses"), /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bg-card)", border: "1px solid var(--line)", borderRadius: 16, padding: "14px 12px 4px" } }, /* @__PURE__ */ React.createElement(Histogram, { buckets, truth: TRUTH, mean, highlight: mid }), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { display: "flex", justifyContent: "space-around", fontSize: 11, color: "var(--ink-4)", padding: "0 8px" } }, /* @__PURE__ */ React.createElement("span", null, "low"), /* @__PURE__ */ React.createElement("span", null, "guesses \u2192"), /* @__PURE__ */ React.createElement("span", null, "high"))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Truth", value: TRUTH.toLocaleString(), tone: "noise" }), /* @__PURE__ */ React.createElement(Stat, { label: "Crowd median", value: median.toLocaleString(), tone: "signal", sub: `off by ${Math.abs(median - TRUTH)}` }), /* @__PURE__ */ React.createElement(Stat, { label: "Your guess", value: mid.toLocaleString(), sub: `off by ${Math.abs(mid - TRUTH)}`, tone: hitMid ? "good" : "neutral" })), /* @__PURE__ */ React.createElement(Callout, { tone: inCI ? "good" : "noise", icon: inCI ? "\u2713" : "\u2717" }, /* @__PURE__ */ React.createElement("strong", null, "Your 90% interval ", inCI ? "caught the truth." : "missed."), " ", " ", inCI ? "Nice \u2014 wide enough to capture uncertainty." : "A miss usually means the interval was too narrow. Most people underestimate how wide their intervals should be."), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "\u2211" }, /* @__PURE__ */ React.createElement("strong", null, "Aggregation removes noise \u2014 but not shared bias."), " The crowd's median (", median.toLocaleString(), ") beats ", Math.round(crowd.filter((g) => Math.abs(g - TRUTH) > Math.abs(median - TRUTH)).length / crowd.length * 100), "% of the individual guesses: pooling cancels the random over- and under-shooting. Yet it's still ", Math.abs(median - TRUTH).toLocaleString(), " off the truth (", Math.round(Math.abs(median - TRUTH) / TRUTH * 100), "%), because this crowd shares a systematic ", /* @__PURE__ */ React.createElement("em", null, "downward"), " lean \u2014 most people lowball a densely packed jar. Wisdom of crowds works when errors are independent; when everyone leans the same way, the crowd is confidently wrong together."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { onClick: () => {
+    recordScore("crowd", { mid, low, high, truth: TRUTH, inCI, median });
+    onComplete();
+  }, size: "lg" }, "Finish station \u2192"))))));
+};
+Object.assign(window, { StationSignal, StationCalibration, StationBrier, StationBaseRate, StationBayes, StationCrowd });
+
+</script>
+<script>
+
+(function(){
+  var COMP = window["StationCrowd"];
+  var EXTRA = {};
+  var h = React.createElement;
+  function Header(){
+    return h('div',{style:{position:'sticky',top:0,zIndex:50,backdropFilter:'blur(16px) saturate(150%)',background:'rgba(241,236,222,.78)',borderBottom:'1px solid var(--line)'}},
+      h('div',{style:{maxWidth:1320,margin:'0 auto',padding:'12px 24px',display:'flex',alignItems:'center',gap:16}},
+        h('a',{href:'../',className:'btn',style:{display:'flex',alignItems:'center',gap:10,background:'transparent',padding:0,textDecoration:'none'}},
+          h('svg',{width:30,height:30,viewBox:'0 0 34 34'},
+            h('circle',{cx:17,cy:17,r:16,fill:'var(--ink)'}),
+            h('path',{d:'M3 19 Q 7 11, 11 19 T 19 19 T 27 19 T 31 19',fill:'none',stroke:'var(--noise)',strokeWidth:1.4,strokeLinecap:'round',opacity:.8}),
+            h('path',{d:'M 5 17 L 11 17 L 14 9 L 20 25 L 23 17 L 29 17',fill:'none',stroke:'var(--bg-card)',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'})
+          ),
+          h('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',lineHeight:1.05}},
+            h('span',{className:'serif',style:{fontWeight:600,letterSpacing:'-.02em',fontSize:18,color:'var(--ink)'}},'Signal & Noise Lab'),
+            h('span',{className:'serif',style:{fontSize:10.5,fontStyle:'italic',color:'var(--ink-3)',fontWeight:400}},'Maxted Neal')
+          )
+        ),
+        h('div',{style:{flex:1}}),
+        h('span',{className:'mono',style:{fontSize:12,color:'var(--ink-3)'}}, "Wisdom of Crowds"),
+        h('a',{href:'../',className:'btn',style:{padding:'8px 14px',borderRadius:999,fontSize:13,fontWeight:500,background:'var(--bg-soft)',color:'var(--ink-2)',border:'1px solid var(--line-2)',textDecoration:'none'}},'↩ All sims')
+      )
+    );
+  }
+  function Page(){
+    var st = React.useState(0), k = st[0], setK = st[1];
+    function record(id,data){ window.__lastScore={id:id,data:data}; try{console.log('[score]',id,data);}catch(e){} }
+    function done(){ setK(k+1); window.scrollTo({top:0}); }
+    return h('div',{className:'shell paper'},
+      h(Header,null),
+      h('div',{style:{flex:1}},
+        h('div',{style:{maxWidth:1000,margin:'0 auto',padding:'40px 28px 80px'}},
+          COMP ? h(COMP, Object.assign({key:k, onComplete:done, recordScore:record}, EXTRA))
+               : h('div',{style:{padding:40,color:'var(--bad)'}},'Component StationCrowd failed to load.')
+        )
+      )
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Page));
+})();
+
+</script>
+</body>
+</html>

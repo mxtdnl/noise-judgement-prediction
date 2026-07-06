@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Trial Lawyer · Signal & Noise Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+    :root{
+      --bg:#F1ECDE;
+      --bg-card:#FFFDF6;
+      --bg-soft:#EBE4D2;
+      --ink:#1A1814;
+      --ink-2:#3C372E;
+      --ink-3:#6B6457;
+      --ink-4:#9A917F;
+      --line:#E2D9C2;
+      --line-2:#D2C7A8;
+      --signal:#1E5F70;
+      --signal-2:#2A8295;
+      --signal-soft:#D6E6E9;
+      --noise:#E66B3D;
+      --noise-2:#CA5430;
+      --noise-soft:#F7DBCB;
+      --gold:#C99425;
+      --gold-soft:#F2E2B5;
+      --leaf:#5A7A3D;
+      --leaf-soft:#DBE5C7;
+      --bad:#B6402A;
+      --good:#3F7A4A;
+      --r-sm:8px; --r-md:14px; --r-lg:22px; --r-xl:32px;
+      --shadow-sm:0 1px 0 rgba(0,0,0,.04), 0 1px 2px rgba(46,38,20,.06);
+      --shadow-md:0 1px 0 rgba(255,253,246,.7) inset, 0 1px 0 rgba(0,0,0,.04), 0 6px 18px rgba(46,38,20,.08);
+      --shadow-lg:0 1px 0 rgba(255,253,246,.7) inset, 0 8px 32px rgba(46,38,20,.14);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+      font-family:"Geist","Geist Fallback",ui-sans-serif,system-ui,sans-serif;
+      font-feature-settings:"ss01","ss02","cv11";
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+    body{min-height:100vh;overflow-x:hidden}
+    .serif{font-family:"Newsreader",ui-serif,Georgia,serif; font-weight:500; letter-spacing:-.01em}
+    .mono{font-family:"Geist Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+    button{font-family:inherit; color:inherit}
+    a{color:inherit}
+
+    /* paper texture */
+    .paper{
+      background:
+        radial-gradient(1200px 600px at 90% -10%, rgba(201,148,37,.06), transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, rgba(30,95,112,.06), transparent 55%),
+        var(--bg);
+    }
+
+    /* generic */
+    .card{background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-md)}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid var(--line-2); background:var(--bg-card); color:var(--ink-2)}
+    .kbd{font-family:"Geist Mono",monospace; font-size:11px; padding:2px 6px; border-radius:5px; background:var(--bg-soft); border:1px solid var(--line-2); color:var(--ink-2)}
+
+    /* button reset for our React Button */
+    .btn{appearance:none; border:0; cursor:pointer; transition:transform .12s ease, box-shadow .2s ease, background .2s ease}
+    .btn:active{transform:translateY(1px)}
+
+    /* slider track */
+    input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:36px; background:transparent; cursor:pointer}
+    input[type=range]:focus{outline:none}
+    input[type=range]::-webkit-slider-runnable-track{height:8px; border-radius:999px; background:var(--bg-soft); border:1px solid var(--line)}
+    input[type=range]::-moz-range-track{height:8px; border-radius:999px; background:var(--bg-soft); border:1px solid var(--line)}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%; background:var(--ink); border:3px solid #FFFDF6; box-shadow:0 2px 8px rgba(0,0,0,.18); margin-top:-10px}
+    input[type=range]::-moz-range-thumb{width:24px; height:24px; border-radius:50%; background:var(--ink); border:3px solid #FFFDF6; box-shadow:0 2px 8px rgba(0,0,0,.18)}
+
+    /* scrollbar */
+    ::-webkit-scrollbar{width:10px; height:10px}
+    ::-webkit-scrollbar-thumb{background:rgba(60,55,46,.25); border-radius:8px; border:2px solid transparent; background-clip:content-box}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(60,55,46,.4); background-clip:content-box; border:2px solid transparent}
+
+    /* layout */
+    .shell{min-height:100vh; display:flex; flex-direction:column}
+    .topbar{position:sticky; top:0; z-index:50; backdrop-filter:blur(16px) saturate(150%); background:rgba(241,236,222,.78); border-bottom:1px solid var(--line)}
+
+    /* animations */
+    @keyframes fadeUp{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+    .fadeup{animation:fadeUp .35s ease-out both}
+    @keyframes pop{from{transform:scale(.94); opacity:0} to{transform:scale(1); opacity:1}}
+    .pop{animation:pop .25s cubic-bezier(.2,.9,.3,1.2) both}
+    @keyframes pulse{0%,100%{opacity:.8} 50%{opacity:.35}}
+    .pulse{animation:pulse 1.6s ease-in-out infinite}
+
+    /* sr-only */
+    .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* dark variant overrides applied through .theme-dark wrapper */
+    .theme-dark{
+      --bg:#16140F; --bg-card:#201D17; --bg-soft:#2A2620; --ink:#F2EBD8; --ink-2:#D7CFB8;
+      --ink-3:#9B9279; --ink-4:#6C6552; --line:#332E25; --line-2:#3F392E;
+      --signal-soft:#163942; --noise-soft:#3C2418; --gold-soft:#3B2F11; --leaf-soft:#293321;
+    }
+    .theme-dark .paper{background:
+      radial-gradient(1200px 600px at 90% -10%, rgba(201,148,37,.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(42,130,149,.10), transparent 55%),
+      var(--bg);}
+    .theme-dark input[type=range]::-webkit-slider-thumb{background:#F2EBD8; border-color:#201D17}
+    .theme-dark .topbar{background:rgba(22,20,15,.78)}
+
+    /* cool variant */
+    .theme-cool{
+      --bg:#ECEEF1; --bg-card:#FFFFFF; --bg-soft:#E1E5EA; --ink:#11161D; --ink-2:#2D343F;
+      --ink-3:#5B6471; --ink-4:#8A93A1; --line:#D8DDE3; --line-2:#C5CCD4;
+      --signal:#1C5BBE; --signal-2:#3D7DDF; --signal-soft:#D7E4F7;
+      --noise:#D24A6B; --noise-2:#B53757; --noise-soft:#F4D6DF;
+      --gold:#A6822D; --gold-soft:#EFE0BA; --leaf:#3A7A6A; --leaf-soft:#D0E4DC;
+    }
+
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="../shared/react.production.min.js"></script>
+<script src="../shared/react-dom.production.min.js"></script>
+<script>
+const Button = ({ children, variant = "primary", size = "md", disabled, onClick, style, icon }) => {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontWeight: 600,
+    letterSpacing: "-.01em",
+    borderRadius: 999,
+    border: "1px solid transparent",
+    whiteSpace: "nowrap",
+    boxShadow: "var(--shadow-sm)",
+    transition: "all .18s ease"
+  };
+  const sizes = {
+    sm: { padding: "7px 14px", fontSize: 13 },
+    md: { padding: "11px 20px", fontSize: 14.5 },
+    lg: { padding: "14px 26px", fontSize: 16 }
+  };
+  const variants = {
+    primary: { background: "var(--ink)", color: "var(--bg-card)", borderColor: "var(--ink)" },
+    signal: { background: "var(--signal)", color: "#fff", borderColor: "var(--signal)" },
+    noise: { background: "var(--noise)", color: "#fff", borderColor: "var(--noise)" },
+    ghost: { background: "transparent", color: "var(--ink-2)", borderColor: "var(--line-2)" },
+    soft: { background: "var(--bg-soft)", color: "var(--ink)", borderColor: "var(--line)" },
+    quiet: { background: "transparent", color: "var(--ink-3)", borderColor: "transparent", boxShadow: "none" }
+  };
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "btn",
+      disabled,
+      onClick,
+      style: { ...base, ...sizes[size], ...variants[variant], opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer", ...style }
+    },
+    icon,
+    children
+  );
+};
+const Panel = ({ title, eyebrow, children, style, accent }) => /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: "28px 30px", position: "relative", ...style } }, accent && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 30, right: 30, height: 3, background: accent, borderRadius: "0 0 4px 4px" } }), eyebrow && /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, textTransform: "uppercase", letterSpacing: ".14em", color: "var(--ink-4)", marginBottom: 10 } }, eyebrow), title && /* @__PURE__ */ React.createElement("h2", { className: "serif", style: { margin: "0 0 14px", fontSize: 28, lineHeight: 1.1, color: "var(--ink)" } }, title), children);
+const Chip = ({ children, tone = "neutral", active, onClick, style }) => {
+  const tones = {
+    neutral: { background: "var(--bg-soft)", color: "var(--ink-2)", border: "1px solid var(--line-2)" },
+    signal: { background: "var(--signal-soft)", color: "var(--signal)", border: "1px solid color-mix(in oklab, var(--signal) 25%, transparent)" },
+    noise: { background: "var(--noise-soft)", color: "var(--noise-2)", border: "1px solid color-mix(in oklab, var(--noise) 25%, transparent)" },
+    gold: { background: "var(--gold-soft)", color: "var(--gold)", border: "1px solid color-mix(in oklab, var(--gold) 25%, transparent)" },
+    leaf: { background: "var(--leaf-soft)", color: "var(--leaf)", border: "1px solid color-mix(in oklab, var(--leaf) 25%, transparent)" }
+  };
+  return /* @__PURE__ */ React.createElement(
+    "span",
+    {
+      onClick,
+      role: onClick ? "button" : void 0,
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 11px",
+        borderRadius: 999,
+        fontSize: 12.5,
+        fontWeight: 500,
+        cursor: onClick ? "pointer" : "default",
+        ...tones[tone],
+        ...active ? { outline: "2px solid var(--ink)", outlineOffset: 2 } : {},
+        ...style
+      }
+    },
+    children
+  );
+};
+const ProbabilitySlider = ({ value, onChange, lowLabel = "No", highLabel = "Yes", accent = "var(--signal)" }) => {
+  const v = Math.max(0, Math.min(100, value));
+  return /* @__PURE__ */ React.createElement("div", { style: { width: "100%" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 10, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${v}%`, background: accent, transition: "width .15s ease" } })), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "range",
+      min: "0",
+      max: "100",
+      value: v,
+      onChange: (e) => onChange(+e.target.value),
+      style: { marginTop: -22, position: "relative", zIndex: 2 }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--ink-3)", marginTop: -2 } }, /* @__PURE__ */ React.createElement("span", null, lowLabel), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--ink)", fontWeight: 600, fontSize: 18 } }, v, "%"), /* @__PURE__ */ React.createElement("span", null, highLabel)));
+};
+const CIInput = ({ low, mid, high, min, max, unit = "", onChange }) => {
+  const range = max - min;
+  const pct = (v) => (v - min) / range * 100;
+  const fmt = (n) => {
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k";
+    return Math.round(n).toString();
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 40, marginTop: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 18, left: 0, right: 0, height: 4, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 18, left: `${pct(low)}%`, width: `${pct(high) - pct(low)}%`, height: 4, borderRadius: 999, background: "var(--signal)" } }), [
+    { v: low, key: "low", label: "low" },
+    { v: mid, key: "mid", label: "best" },
+    { v: high, key: "high", label: "high" }
+  ].map((h) => /* @__PURE__ */ React.createElement("div", { key: h.key, style: { position: "absolute", top: 6, left: `calc(${pct(h.v)}% - 14px)`, width: 28, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 18, height: 28, margin: "0 auto", borderRadius: 6, background: h.key === "mid" ? "var(--ink)" : "var(--bg-card)", border: "2px solid var(--ink)", boxShadow: "var(--shadow-sm)" } }), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-3)", marginTop: 2 } }, h.label)))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 18 } }, [["low", "5%"], ["mid", "best guess"], ["high", "95%"]].map(([k, lbl]) => /* @__PURE__ */ React.createElement("label", { key: k, style: { display: "block" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".1em", marginBottom: 4 } }, lbl), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, background: "var(--bg-soft)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "number",
+      value: k === "low" ? low : k === "mid" ? mid : high,
+      onChange: (e) => {
+        const v = +e.target.value;
+        onChange({ low: k === "low" ? v : low, mid: k === "mid" ? v : mid, high: k === "high" ? v : high });
+      },
+      style: { flex: 1, border: 0, outline: 0, background: "transparent", font: '500 16px/1.2 "Geist Mono",monospace', color: "var(--ink)", width: "100%" }
+    }
+  ), unit && /* @__PURE__ */ React.createElement("span", { className: "mono", style: { color: "var(--ink-3)", fontSize: 13 } }, unit))))));
+};
+const ConfidenceSlider = ({ value, onChange, min = 0, max = 100 }) => {
+  const v = Math.max(min, Math.min(max, value));
+  const pct = (v - min) / (max - min) * 100;
+  const labels = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(min + f * (max - min)));
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 14, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: "linear-gradient(90deg, var(--signal-soft), var(--signal))", transition: "width .12s ease" } }), [20, 40, 60, 80].map((t) => /* @__PURE__ */ React.createElement("div", { key: t, style: { position: "absolute", left: `${t}%`, top: 0, bottom: 0, width: 1, background: "rgba(0,0,0,.08)" } }))), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      type: "range",
+      min,
+      max,
+      value: v,
+      step: "1",
+      onChange: (e) => onChange(+e.target.value),
+      style: { marginTop: -24, position: "relative", zIndex: 2 }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-4)", marginTop: -4, padding: "0 2px" } }, labels.map((l, i) => /* @__PURE__ */ React.createElement("span", { key: i }, l, "%"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginTop: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 24px", borderRadius: 999, background: "var(--ink)", color: "var(--bg-card)", fontFamily: '"Geist Mono",monospace', fontSize: 28, fontWeight: 600, letterSpacing: "-.02em" } }, v, "%")));
+};
+const Stat = ({ label, value, sub, tone = "neutral" }) => {
+  const colors = {
+    neutral: "var(--ink)",
+    good: "var(--good)",
+    bad: "var(--bad)",
+    signal: "var(--signal)",
+    noise: "var(--noise-2)"
+  };
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, label), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 28, fontWeight: 600, color: colors[tone], marginTop: 2, lineHeight: 1.05 } }, value), sub && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "var(--ink-3)", marginTop: 2 } }, sub));
+};
+const Callout = ({ children, tone = "neutral", icon }) => {
+  const tones = {
+    neutral: { background: "var(--bg-soft)", border: "1px solid var(--line)" },
+    signal: { background: "var(--signal-soft)", border: "1px solid color-mix(in oklab, var(--signal) 20%, transparent)" },
+    noise: { background: "var(--noise-soft)", border: "1px solid color-mix(in oklab, var(--noise) 25%, transparent)" },
+    gold: { background: "var(--gold-soft)", border: "1px solid color-mix(in oklab, var(--gold) 25%, transparent)" },
+    good: { background: "var(--leaf-soft)", border: "1px solid color-mix(in oklab, var(--leaf) 25%, transparent)" }
+  };
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, padding: "14px 16px", borderRadius: 14, ...tones[tone] } }, icon && /* @__PURE__ */ React.createElement("div", { style: { flex: "0 0 24px", fontSize: 18, lineHeight: 1 } }, icon), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14.5, lineHeight: 1.55, color: "var(--ink-2)" } }, children));
+};
+const ProgressDots = ({ total, current }) => /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, Array.from({ length: total }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: {
+  width: i === current ? 24 : 8,
+  height: 8,
+  borderRadius: 999,
+  background: i < current ? "var(--ink)" : i === current ? "var(--ink)" : "var(--line-2)",
+  transition: "all .25s ease"
+} })));
+const Stamp = ({ label, tone = "good" }) => {
+  const tones = {
+    good: { color: "var(--good)", borderColor: "var(--good)" },
+    bad: { color: "var(--bad)", borderColor: "var(--bad)" },
+    gold: { color: "var(--gold)", borderColor: "var(--gold)" }
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "mono", style: {
+    display: "inline-block",
+    padding: "4px 10px",
+    borderRadius: 6,
+    border: `1.5px solid ${tones[tone].borderColor}`,
+    color: tones[tone].color,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: ".16em",
+    textTransform: "uppercase",
+    transform: "rotate(-2deg)"
+  } }, label);
+};
+Object.assign(window, { Button, Panel, Chip, ProbabilitySlider, ConfidenceSlider, CIInput, Stat, Callout, ProgressDots, Stamp });
+
+</script>
+<script>
+const mulberry32 = (a) => () => {
+  a |= 0;
+  a = a + 1831565813 | 0;
+  let t = a;
+  t = Math.imul(t ^ t >>> 15, t | 1);
+  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+};
+const gauss = (rng) => {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+};
+const genSeries = ({ seed = 1, n = 40, signal = "none", noise = 8, bias = 50 } = {}) => {
+  const rng = mulberry32(seed);
+  const points = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    let sig = bias;
+    if (signal === "up") sig = bias + (t - 0.5) * 30;
+    if (signal === "down") sig = bias - (t - 0.5) * 30;
+    if (signal === "step") sig = bias + (t > 0.55 ? 16 : -4);
+    if (signal === "cycle") sig = bias + Math.sin(t * Math.PI * 2.2) * 14;
+    if (signal === "none") sig = bias;
+    const y = sig + gauss(rng) * noise;
+    points.push({ x: i, y, sig });
+  }
+  return points;
+};
+const TimeSeriesChart = ({ data, w = 520, h = 220, showSignal = false, color = "var(--ink-2)", signalColor = "var(--signal)", highlight = null, mark = null }) => {
+  const pad = { l: 36, r: 16, t: 16, b: 26 };
+  const xs = data.map((d) => d.x);
+  const ys = data.map((d) => d.y);
+  const minY = Math.min(...ys, ...showSignal ? data.map((d) => d.sig) : []);
+  const maxY = Math.max(...ys, ...showSignal ? data.map((d) => d.sig) : []);
+  const padY = (maxY - minY) * 0.18 || 5;
+  const yMin = minY - padY, yMax = maxY + padY;
+  const sx = (x) => pad.l + x / (data.length - 1) * (w - pad.l - pad.r);
+  const sy = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * (h - pad.t - pad.b);
+  const path = data.map((d, i) => `${i ? "L" : "M"} ${sx(d.x)} ${sy(d.y)}`).join(" ");
+  const sigPath = data.map((d, i) => `${i ? "L" : "M"} ${sx(d.x)} ${sy(d.sig)}`).join(" ");
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement(
+    "line",
+    {
+      key: i,
+      x1: pad.l,
+      x2: w - pad.r,
+      y1: pad.t + t * (h - pad.t - pad.b),
+      y2: pad.t + t * (h - pad.t - pad.b),
+      stroke: "var(--line)",
+      strokeWidth: "1",
+      strokeDasharray: i === 0 || i === 4 ? "" : "2 4"
+    }
+  )), showSignal && /* @__PURE__ */ React.createElement(
+    "path",
+    {
+      d: sigPath,
+      fill: "none",
+      stroke: signalColor,
+      strokeWidth: "3",
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      style: { filter: "drop-shadow(0 1px 0 rgba(0,0,0,.04))" }
+    }
+  ), /* @__PURE__ */ React.createElement("path", { d: path, fill: "none", stroke: color, strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", opacity: showSignal ? 0.45 : 0.9 }), data.map((d, i) => /* @__PURE__ */ React.createElement("circle", { key: i, cx: sx(d.x), cy: sy(d.y), r: 2.5, fill: color, opacity: showSignal ? 0.55 : 0.9 })), /* @__PURE__ */ React.createElement("text", { x: pad.l, y: h - 6, fontSize: "10", fill: "var(--ink-4)", className: "mono" }, "t=0"), /* @__PURE__ */ React.createElement("text", { x: w - pad.r, y: h - 6, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, "t=", data.length - 1));
+};
+const CalibrationPlot = ({ buckets, w = 380, h = 380 }) => {
+  const pad = 44;
+  const sx = (p) => pad + p * (w - pad * 2);
+  const sy = (p) => h - pad - p * (h - pad * 2);
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("line", { x1: sx(t), x2: sx(t), y1: sy(0), y2: sy(1), stroke: "var(--line)", strokeDasharray: "2 4" }), /* @__PURE__ */ React.createElement("line", { x1: sx(0), x2: sx(1), y1: sy(t), y2: sy(t), stroke: "var(--line)", strokeDasharray: "2 4" }))), /* @__PURE__ */ React.createElement("line", { x1: sx(0), y1: sy(0), x2: sx(1), y2: sy(1), stroke: "var(--ink-4)", strokeWidth: "1.5", strokeDasharray: "4 5" }), /* @__PURE__ */ React.createElement("line", { x1: sx(0), y1: sy(0), x2: sx(1), y2: sy(0), stroke: "var(--ink)", strokeWidth: "1.5" }), /* @__PURE__ */ React.createElement("line", { x1: sx(0), y1: sy(0), x2: sx(0), y2: sy(1), stroke: "var(--ink)", strokeWidth: "1.5" }), (() => {
+    const pts = buckets.filter((b) => b.n > 0).map((b) => [sx(b.p), sy(b.freq)]);
+    if (pts.length < 2) return null;
+    return /* @__PURE__ */ React.createElement("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: "var(--signal)", strokeWidth: "2.5", opacity: ".75" });
+  })(), buckets.map((b, i) => b.n > 0 && /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("circle", { cx: sx(b.p), cy: sy(b.freq), r: 6 + Math.min(b.n, 8) * 1.5, fill: "var(--signal)", opacity: ".18" }), /* @__PURE__ */ React.createElement("circle", { cx: sx(b.p), cy: sy(b.freq), r: 5.5, fill: "var(--signal)", stroke: "#fff", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("text", { x: sx(b.p), y: sy(b.freq) - 12, fontSize: "10", fill: "var(--ink-2)", textAnchor: "middle", className: "mono" }, b.n))), /* @__PURE__ */ React.createElement("text", { x: sx(0.5), y: h - 8, textAnchor: "middle", fontSize: "12", fill: "var(--ink-3)" }, "your stated probability \u2192"), /* @__PURE__ */ React.createElement("text", { x: 12, y: sy(0.5), textAnchor: "middle", fontSize: "12", fill: "var(--ink-3)", transform: `rotate(-90 12 ${sy(0.5)})` }, "actual frequency \u2192"), /* @__PURE__ */ React.createElement("text", { x: sx(0.05), y: sy(0.95), fontSize: "10", fill: "var(--ink-4)", className: "mono" }, "under-confident"), /* @__PURE__ */ React.createElement("text", { x: sx(0.95), y: sy(0.08), fontSize: "10", fill: "var(--ink-4)", className: "mono", textAnchor: "end" }, "over-confident"));
+};
+const DotField = ({ rows = 20, cols = 20, classify, dotSize = 14, gap = 2, animate = false }) => {
+  const total = rows * cols;
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: `repeat(${cols}, ${dotSize}px)`, gap, padding: 6 } }, Array.from({ length: total }).map((_, i) => {
+    const c = classify(i);
+    const colors = {
+      well: "var(--line-2)",
+      sick: "var(--noise)",
+      tp: "var(--noise)",
+      fp: "var(--gold)",
+      fn: "var(--line-2)",
+      tn: "var(--bg-soft)",
+      neg: "var(--bg-soft)",
+      hit: "var(--leaf)",
+      miss: "var(--bg-soft)",
+      custom: c?.color || "var(--line-2)"
+    };
+    const cls = typeof c === "string" ? c : c?.type || "neg";
+    const color = c?.color || colors[cls];
+    return /* @__PURE__ */ React.createElement("div", { key: i, style: {
+      width: dotSize,
+      height: dotSize,
+      borderRadius: "50%",
+      background: color,
+      border: cls === "tn" || cls === "neg" || cls === "miss" ? "1px solid var(--line-2)" : "none",
+      transition: animate ? `all .35s ease ${i * 4}ms` : "none"
+    } });
+  }));
+};
+const BrierHistory = ({ rounds, w = 480, h = 160 }) => {
+  if (rounds.length === 0) return null;
+  const pad = { l: 32, r: 14, t: 14, b: 24 };
+  const maxRounds = Math.max(rounds.length, 8);
+  const sx = (i) => pad.l + i / (maxRounds - 1) * (w - pad.l - pad.r);
+  const sy = (v) => pad.t + (1 - Math.min(v / 1, 1)) * (h - pad.t - pad.b);
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, /* @__PURE__ */ React.createElement("rect", { x: pad.l, y: sy(0.25), width: w - pad.l - pad.r, height: sy(0) - sy(0.25), fill: "var(--leaf-soft)", opacity: ".5" }), /* @__PURE__ */ React.createElement("rect", { x: pad.l, y: sy(0.5), width: w - pad.l - pad.r, height: sy(0.25) - sy(0.5), fill: "var(--gold-soft)", opacity: ".5" }), /* @__PURE__ */ React.createElement("rect", { x: pad.l, y: sy(1), width: w - pad.l - pad.r, height: sy(0.5) - sy(1), fill: "var(--noise-soft)", opacity: ".4" }), [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement("line", { key: i, x1: pad.l, x2: w - pad.r, y1: sy(t), y2: sy(t), stroke: "var(--line)", strokeDasharray: i === 0 ? "" : "2 4" })), rounds.map((r, i) => /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("line", { x1: sx(i), x2: sx(i), y1: sy(0), y2: sy(r.score), stroke: "var(--ink-3)", strokeWidth: "1", opacity: ".4" }), /* @__PURE__ */ React.createElement("circle", { cx: sx(i), cy: sy(r.score), r: 5, fill: r.score < 0.15 ? "var(--leaf)" : r.score < 0.3 ? "var(--gold)" : "var(--noise)", stroke: "#fff", strokeWidth: "2" }))), /* @__PURE__ */ React.createElement("text", { x: pad.l - 6, y: sy(0) + 3, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, "0"), /* @__PURE__ */ React.createElement("text", { x: pad.l - 6, y: sy(0.5) + 3, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, ".5"), /* @__PURE__ */ React.createElement("text", { x: pad.l - 6, y: sy(1) + 3, fontSize: "10", fill: "var(--ink-4)", textAnchor: "end", className: "mono" }, "1"));
+};
+const Histogram = ({ buckets, w = 520, h = 180, accent = "var(--signal)", highlight = null, truth = null, mean = null }) => {
+  const pad = { l: 14, r: 14, t: 14, b: 26 };
+  const maxC = Math.max(...buckets.map((b) => b.count), 1);
+  const bw = (w - pad.l - pad.r) / buckets.length;
+  return /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${w} ${h}`, width: "100%", style: { display: "block", maxHeight: h } }, buckets.map((b, i) => {
+    const bh = b.count / maxC * (h - pad.t - pad.b);
+    const x = pad.l + i * bw;
+    const y = h - pad.b - bh;
+    const isHi = highlight !== null && b.x0 <= highlight && highlight < b.x1;
+    return /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement(
+      "rect",
+      {
+        x: x + 1,
+        y,
+        width: bw - 2,
+        height: bh,
+        fill: isHi ? "var(--ink)" : accent,
+        opacity: isHi ? 1 : 0.68,
+        rx: "2"
+      }
+    ));
+  }), /* @__PURE__ */ React.createElement("line", { x1: pad.l, x2: w - pad.r, y1: h - pad.b, y2: h - pad.b, stroke: "var(--ink)", strokeWidth: "1.2" }), truth !== null && (() => {
+    const xv = pad.l + (truth - buckets[0].x0) / (buckets[buckets.length - 1].x1 - buckets[0].x0) * (w - pad.l - pad.r);
+    return /* @__PURE__ */ React.createElement("g", null, /* @__PURE__ */ React.createElement("line", { x1: xv, x2: xv, y1: pad.t, y2: h - pad.b + 6, stroke: "var(--noise-2)", strokeWidth: "2", strokeDasharray: "3 3" }), /* @__PURE__ */ React.createElement("text", { x: xv, y: pad.t + 10, textAnchor: "middle", fontSize: "11", fill: "var(--noise-2)", className: "mono" }, "truth"));
+  })(), mean !== null && (() => {
+    const xv = pad.l + (mean - buckets[0].x0) / (buckets[buckets.length - 1].x1 - buckets[0].x0) * (w - pad.l - pad.r);
+    return /* @__PURE__ */ React.createElement("g", null, /* @__PURE__ */ React.createElement("line", { x1: xv, x2: xv, y1: pad.t + 18, y2: h - pad.b + 6, stroke: "var(--signal)", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("text", { x: xv, y: pad.t + 28, textAnchor: "middle", fontSize: "11", fill: "var(--signal)", className: "mono" }, "mean"));
+  })());
+};
+const BeliefBar = ({ prior, posterior, label = "belief" }) => /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".12em" } }, label), /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 24, fontWeight: 600, color: "var(--ink)" } }, Math.round(posterior * 100), "%")), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: 18, borderRadius: 999, background: "var(--bg-soft)", border: "1px solid var(--line)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: 0, top: 0, bottom: 0, width: `${posterior * 100}%`, background: "linear-gradient(90deg, var(--signal), var(--signal-2))", transition: "width .6s cubic-bezier(.2,.9,.3,1)" } }), prior != null && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", left: `${prior * 100}%`, top: -2, bottom: -2, width: 2, background: "var(--noise-2)" }, title: `Prior: ${Math.round(prior * 100)}%` })));
+Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries });
+
+</script>
+<script>
+const TrialCase = {
+  defendant: "James Crowell",
+  charge: "second-degree murder",
+  victim: "his business partner",
+  prior: 0.15,
+  // most people accused don't go to trial, but those that do — depends
+  evidence: [
+    { id: 1, text: "Defendant was the last known person to see the victim alive (per phone records).", lr: 1.6, note: "Common in homicide cases involving close associates \u2014 moderate but not decisive." },
+    { id: 2, text: "Defendant had taken out a $2M insurance policy on the victim 6 months before.", lr: 3, note: "Strong motive evidence. Insurance windows are a known red flag." },
+    { id: 3, text: "Defendant's alibi is corroborated by 1 family member (sister).", lr: 0.8, note: "Weak alibi \u2014 close family corroboration is the lowest-credibility category." },
+    { id: 4, text: "No physical evidence (DNA, prints) links defendant to the scene.", lr: 0.5, note: "Negative evidence. Reduces probability but doesn't exclude." },
+    { id: 5, text: `A neighbor reports seeing "a tall man matching the defendant's build" enter the victim's home at 9:14 PM. Defendant is 5'7" and average build.`, lr: 0.7, note: "Marginal \u2014 the description doesn't actually match the defendant well." },
+    { id: 6, text: 'Internet search history shows defendant searched "how long does it take to die from blood loss" 3 days before the murder.', lr: 5.5, note: "Devastating evidence. Hard to explain innocently." },
+    { id: 7, text: "Defendant's lawyer presents bank records showing the victim was being blackmailed by an unknown third party.", lr: 0.45, note: "Introduces a credible alternative suspect." }
+  ]
+};
+const StationTrial = ({ onComplete, recordScore }) => {
+  const [phase, setPhase] = React.useState("intro");
+  const [evidenceIdx, setEvidenceIdx] = React.useState(0);
+  const [belief, setBelief] = React.useState(Math.round(TrialCase.prior * 100));
+  const [trajectory, setTrajectory] = React.useState([Math.round(TrialCase.prior * 100)]);
+  const [threshold, setThreshold] = React.useState(95);
+  const [verdict, setVerdict] = React.useState(null);
+  const optimal = React.useMemo(() => {
+    let odds = TrialCase.prior / (1 - TrialCase.prior);
+    const traj = [TrialCase.prior];
+    for (const ev of TrialCase.evidence) {
+      odds *= ev.lr;
+      traj.push(odds / (1 + odds));
+    }
+    return traj;
+  }, []);
+  const finalOptimal = optimal[optimal.length - 1];
+  const truth = finalOptimal > 0.7;
+  const seeEvidence = () => {
+    setBelief(trajectory[trajectory.length - 1]);
+    setPhase("evidence");
+  };
+  const lockUpdate = () => {
+    const newTraj = [...trajectory, belief];
+    setTrajectory(newTraj);
+    if (evidenceIdx + 1 >= TrialCase.evidence.length) {
+      setPhase("threshold");
+      return;
+    }
+    setEvidenceIdx(evidenceIdx + 1);
+  };
+  const decide = (v) => {
+    setVerdict(v);
+    const finalBelief = belief / 100;
+    const optimalChoice = finalOptimal >= threshold / 100 ? "guilty" : "not_guilty";
+    const userChoice = finalBelief >= threshold / 100 ? "guilty" : "not_guilty";
+    const actualChoice = v;
+    const matchedThreshold = userChoice === actualChoice;
+    const calibrated = Math.abs(finalBelief - finalOptimal) < 0.1;
+    const correct = actualChoice === optimalChoice;
+    recordScore("trial", { finalBelief, finalOptimal, threshold, verdict: v, correct, matchedThreshold, calibrated, trajectory: [...trajectory, belief], optimal });
+    setPhase("reveal");
+  };
+  if (phase === "intro") {
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Trial Lawyer", title: `The State v. ${TrialCase.defendant}`, accent: "var(--noise-2)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u2696" }, TrialCase.defendant, " is charged with the ", TrialCase.charge, " of ", TrialCase.victim, ". You'll receive 7 pieces of evidence sequentially. After each, set your P(guilty). At the end, choose your conviction threshold and deliver a verdict."), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Prior", value: `${Math.round(TrialCase.prior * 100)}%`, sub: "base rate before any evidence" }), /* @__PURE__ */ React.createElement(Stat, { label: "Evidence to come", value: `${TrialCase.evidence.length}` })), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "\u25D1" }, 'Reminder: in criminal trials, the standard is "beyond a reasonable doubt" \u2014 often interpreted as ~90-95% certainty. Decide your own threshold based on the asymmetric cost of false conviction vs false acquittal.'), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: seeEvidence }, "Begin trial \u2192")));
+  }
+  if (phase === "evidence") {
+    const ev = TrialCase.evidence[evidenceIdx];
+    const prevBelief = trajectory[trajectory.length - 1];
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: `Simulation \xB7 Trial \xB7 Evidence ${evidenceIdx + 1}/${TrialCase.evidence.length}`, title: "New evidence presented.", accent: "var(--noise-2)" }, /* @__PURE__ */ React.createElement(ProgressDots, { total: TrialCase.evidence.length, current: evidenceIdx }), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 22px", borderRadius: 16, background: "var(--bg-soft)", border: "1px solid var(--line)", marginTop: 14, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "exhibit ", evidenceIdx + 1), /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 20, lineHeight: 1.35, marginTop: 4 } }, ev.text)), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em", marginBottom: 6 } }, "before this evidence: ", prevBelief, "%"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 8, color: "var(--ink-2)" } }, "Your updated P(guilty):"), /* @__PURE__ */ React.createElement(ProbabilitySlider, { value: belief, onChange: setBelief, lowLabel: "innocent", highLabel: "guilty", accent: "var(--noise-2)" }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: lockUpdate }, evidenceIdx + 1 >= TrialCase.evidence.length ? "Set threshold \u2192" : "Hear next evidence \u2192")));
+  }
+  if (phase === "threshold") {
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Trial \xB7 Threshold", title: "What threshold convicts?", accent: "var(--noise-2)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u2696" }, "A higher threshold means more wrongful acquittals; a lower threshold means more wrongful convictions. Choose based on how asymmetric you believe the costs are."), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 18, padding: "18px 22px", borderRadius: 16, background: "var(--bg-soft)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 8, color: "var(--ink-2)" } }, "Conviction threshold:"), /* @__PURE__ */ React.createElement(ProbabilitySlider, { value: threshold, onChange: setThreshold, lowLabel: "acquit easily", highLabel: "never convict", accent: "var(--noise-2)" }), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 13, color: "var(--ink-3)", marginTop: 14 } }, threshold < 60 ? "A loose threshold. You will convict on weak evidence." : threshold < 75 ? 'A civil-court-style threshold ("preponderance of evidence").' : threshold < 85 ? 'A moderate threshold \u2014 looser than "beyond reasonable doubt."' : threshold < 95 ? 'Standard criminal-trial threshold ("beyond reasonable doubt").' : "A very strict threshold. Most cases would acquit.")), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 18, padding: "18px 22px", borderRadius: 16, background: "var(--bg-card)", border: "1.5px solid var(--ink)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "your final belief"), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 32, fontWeight: 600 } }, belief, "% guilty"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--ink-3)", marginTop: 4 } }, belief >= threshold ? "Above threshold \u2014 verdict should be GUILTY." : "Below threshold \u2014 verdict should be NOT GUILTY.")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", variant: "ghost", onClick: () => decide("not_guilty") }, "Vote: not guilty"), /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => decide("guilty") }, "Vote: guilty")));
+  }
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Trial \xB7 Verdict", title: verdict === "guilty" ? "You voted GUILTY." : "You voted NOT GUILTY.", accent: verdict === "guilty" ? "var(--noise-2)" : "var(--leaf)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u2696" }, "Your final P(guilty): ", /* @__PURE__ */ React.createElement("strong", null, belief, "%"), ". The Bayes-optimal posterior given all 7 pieces of evidence: ", /* @__PURE__ */ React.createElement("strong", null, Math.round(finalOptimal * 100), "%"), ". Your conviction threshold: ", /* @__PURE__ */ React.createElement("strong", null, threshold, "%"), "."), /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 18px", borderRadius: 14, background: "var(--bg-soft)", border: "1px solid var(--line)", marginTop: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em", marginBottom: 8 } }, "belief trajectory \xB7 you vs. Bayes-optimal"), /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 480 200", width: "100%", style: { maxHeight: 200 } }, [0, 0.25, 0.5, 0.75, 1].map((t, i) => /* @__PURE__ */ React.createElement("line", { key: i, x1: "30", x2: "460", y1: 20 + t * 160, y2: 20 + t * 160, stroke: "var(--line)", strokeDasharray: i === 0 || i === 4 ? "" : "2 4" })), /* @__PURE__ */ React.createElement("line", { x1: "30", x2: "460", y1: 20 + (1 - threshold / 100) * 160, y2: 20 + (1 - threshold / 100) * 160, stroke: "var(--noise-2)", strokeDasharray: "3 3", strokeWidth: "1.5" }), /* @__PURE__ */ React.createElement("text", { x: "450", y: 20 + (1 - threshold / 100) * 160 - 4, fontSize: "10", fill: "var(--noise-2)", textAnchor: "end", className: "mono" }, "conviction threshold"), /* @__PURE__ */ React.createElement(
+    "polyline",
+    {
+      fill: "none",
+      stroke: "var(--ink-4)",
+      strokeWidth: "2",
+      strokeDasharray: "4 4",
+      points: optimal.map((p, i) => {
+        const x = 30 + i / (optimal.length - 1) * 430;
+        const y = 20 + (1 - p) * 160;
+        return `${x},${y}`;
+      }).join(" ")
+    }
+  ), /* @__PURE__ */ React.createElement(
+    "polyline",
+    {
+      fill: "none",
+      stroke: "var(--signal)",
+      strokeWidth: "2.5",
+      points: trajectory.map((p, i) => {
+        const x = 30 + i / (optimal.length - 1) * 430;
+        const y = 20 + (1 - p / 100) * 160;
+        return `${x},${y}`;
+      }).join(" ")
+    }
+  ), trajectory.map((p, i) => {
+    const x = 30 + i / (optimal.length - 1) * 430;
+    const y = 20 + (1 - p / 100) * 160;
+    return /* @__PURE__ */ React.createElement("circle", { key: i, cx: x, cy: y, r: "3", fill: "var(--signal)" });
+  }), /* @__PURE__ */ React.createElement("text", { x: "40", y: "14", fontSize: "10", fill: "var(--signal)", className: "mono" }, "\u2014 you"), /* @__PURE__ */ React.createElement("text", { x: "100", y: "14", fontSize: "10", fill: "var(--ink-3)", className: "mono" }, "- - Bayes-optimal"))), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25C6" }, /* @__PURE__ */ React.createElement("strong", null, "What this case teaches:"), " evidence #6 (the search history) was the decisive piece \u2014 a likelihood ratio of ~5.5\xD7, hard to explain innocently. Most people undershoot it. The defense's alternative suspect (ev #7) had a smaller mitigating effect than people emotionally felt. Real evidence is multiplicative; emotional weight is not. Even so, the Bayes-optimal posterior lands near ", Math.round(finalOptimal * 100), '% \u2014 below any reasonable conviction threshold. A strong-feeling case can still fall short of "beyond reasonable doubt."'), /* @__PURE__ */ React.createElement(Callout, { tone: "gold", icon: "!" }, /* @__PURE__ */ React.createElement("strong", null, "Two caveats."), " (1) These seven likelihood ratios are multiplied assuming each is ", /* @__PURE__ */ React.createElement("em", null, "conditionally independent"), " given guilt \u2014 a simplification; overlapping evidence should really count for less. (2) The 15% starting prior is P(guilty) for ", /* @__PURE__ */ React.createElement("em", null, "this"), ' defendant before any evidence \u2014 deliberately different from the ~83% "trial-conviction rate" in the Brier Arena, which is P(conviction | a case already reached trial), a heavily filtered subset. Same words, different question.'), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: onComplete }, "Back to lab \u2192")));
+};
+const VCPool = [
+  { id: 1, name: "Stratify", sector: "B2B SaaS", pBig: 0.04, bigMult: 12, pBase: 0.35, baseMult: 2.2, signals: ["Solo founder, 1st time", "Decent traction", "Crowded market"] },
+  { id: 2, name: "Holocene", sector: "climate-tech", pBig: 0.12, bigMult: 15, pBase: 0.3, baseMult: 3, signals: ["Two technical co-founders", "Novel materials science", "3 LOIs from majors"] },
+  { id: 3, name: "Pintail", sector: "consumer", pBig: 0.02, bigMult: 10, pBase: 0.18, baseMult: 1.5, signals: ["Hot at YC demo day", "High burn", "Reviews trend negative"] },
+  { id: 4, name: "Lazuli", sector: "fintech", pBig: 0.06, bigMult: 12, pBase: 0.38, baseMult: 2.5, signals: ["Strong technical co-founder", "Regulated space", "Mid traction"] },
+  { id: 5, name: "Vellichor", sector: "consumer AI", pBig: 0.1, bigMult: 14, pBase: 0.34, baseMult: 2.8, signals: ["Repeat founder (1 exit)", "Real moat", "Recent product-market fit"] },
+  { id: 6, name: "Drachma", sector: "crypto", pBig: 0.05, bigMult: 20, pBase: 0.12, baseMult: 1.2, signals: ["Trendy vertical", "Unclear regulation", "Founder turnover"] },
+  { id: 7, name: "Sundial", sector: "devtools", pBig: 0.07, bigMult: 11, pBase: 0.4, baseMult: 2.4, signals: ["Loved by power users", "Slow but real growth", "Open source moat"] },
+  { id: 8, name: "Marrow", sector: "biotech", pBig: 0.09, bigMult: 16, pBase: 0.1, baseMult: 2, signals: ["Promising preclinical", "But FDA path unclear", "Founder is a scientist, not an operator"] }
+];
+const vcEV = (s) => s.pBig * s.bigMult + s.pBase * s.baseMult;
+const StationVC = ({ onComplete, recordScore }) => {
+  const total = 1e4;
+  const [allocs, setAllocs] = React.useState(Object.fromEntries(VCPool.map((s) => [s.id, 0])));
+  const [phase, setPhase] = React.useState("intro");
+  const [outcomes, setOutcomes] = React.useState(null);
+  const remaining = total - Object.values(allocs).reduce((a, b) => a + b, 0);
+  const setAlloc = (id, value) => {
+    const others = total - (Object.values(allocs).reduce((a, b) => a + b, 0) - allocs[id]);
+    setAllocs({ ...allocs, [id]: Math.max(0, Math.min(others, value)) });
+  };
+  const evs = VCPool.map(vcEV);
+  const equalSplitEV = evs.reduce((a, b) => a + b, 0) / evs.length;
+  const maxEV = Math.max(...evs);
+  const expectedMult = VCPool.reduce((s, c) => s + allocs[c.id] * vcEV(c), 0) / total;
+  const resolve = () => {
+    const o = {};
+    for (const s of VCPool) {
+      const r = Math.random();
+      o[s.id] = r < s.pBig ? s.bigMult : r < s.pBig + s.pBase ? s.baseMult : 0;
+    }
+    setOutcomes(o);
+    const realisedMult = VCPool.reduce((s, c) => s + allocs[c.id] * o[c.id], 0) / total;
+    recordScore("vc", { portfolioMult: realisedMult, expectedMult, equalSplitEV, maxEV, allocs, totalUnits: total });
+    setPhase("reveal");
+  };
+  if (phase === "intro") {
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 VC Portfolio", title: "You have $10M to allocate across 8 startups.", accent: "var(--gold)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25D4" }, "Each startup has visible signals \u2014 sector, team, traction notes. There are no guaranteed winners: every startup's 10-year outcome is a random draw. Most fizzle to nothing, some return a modest multiple, a few hit big. The signals tilt the odds; they don't fix the result."), /* @__PURE__ */ React.createElement("p", { style: { color: "var(--ink-2)", marginTop: 14, fontSize: 15 } }, "You'll be graded on the ", /* @__PURE__ */ React.createElement("strong", null, "expected value"), " of your allocation \u2014 did you put money behind the genuinely high-odds bets? Then we roll the dice and show the ", /* @__PURE__ */ React.createElement("strong", null, "realised"), " outcome too. The gap between them is luck, and it's exactly why VCs spread a fund across many good bets instead of staking it all on the one that looks obvious."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => setPhase("allocate") }, "Review startups \u2192")));
+  }
+  if (phase === "reveal" && outcomes) {
+    const realisedMult = VCPool.reduce((s, c) => s + allocs[c.id] * outcomes[c.id], 0) / total;
+    const evVerdict = expectedMult >= 2.2 ? { t: "good", l: "Sharp signal-reading" } : expectedMult >= equalSplitEV ? { t: "gold", l: "Beat the naive split" } : { t: "bad", l: "Spread into weak bets" };
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 VC Portfolio \xB7 Resolved \xB7 10 years later", title: `Realised return: ${realisedMult.toFixed(2)}\xD7`, accent: realisedMult > 2 ? "var(--leaf)" : realisedMult > 1 ? "var(--gold)" : "var(--noise-2)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Realised (luck)", value: `${realisedMult.toFixed(2)}\xD7`, tone: realisedMult > 2 ? "good" : realisedMult > 1 ? "neutral" : "bad", sub: "this one roll" }), /* @__PURE__ */ React.createElement(Stat, { label: "Expected (skill)", value: `${expectedMult.toFixed(2)}\xD7`, tone: expectedMult >= equalSplitEV ? "good" : "bad", sub: "EV of your bets" }), /* @__PURE__ */ React.createElement(Stat, { label: "Equal-split EV", value: `${equalSplitEV.toFixed(2)}\xD7`, sub: "spread evenly" }), /* @__PURE__ */ React.createElement(Stat, { label: "Best-EV possible", value: `${maxEV.toFixed(2)}\xD7`, sub: "all-in top pick" })), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement(Stamp, { label: evVerdict.l, tone: evVerdict.t === "good" ? "good" : evVerdict.t === "bad" ? "bad" : "gold" })), /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bg-card)", border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1.4fr .9fr .8fr .9fr 1fr", padding: "10px 14px", background: "var(--bg-soft)", borderBottom: "1px solid var(--line)" }, className: "mono" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "startup"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "your stake"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "EV"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "drew"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em", textAlign: "right" } }, "returned")), VCPool.map((c, i) => {
+      const m = outcomes[c.id];
+      const returned = allocs[c.id] * m * 100;
+      const stake = allocs[c.id] * 100;
+      return /* @__PURE__ */ React.createElement("div", { key: c.id, style: { display: "grid", gridTemplateColumns: "1.4fr .9fr .8fr .9fr 1fr", padding: "10px 14px", borderBottom: i < VCPool.length - 1 ? "1px solid var(--line)" : "none" }, className: "mono" }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 500 } }, c.name), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "$", (stake / 1e3).toFixed(0), "k"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "var(--ink-3)" } }, vcEV(c).toFixed(2), "\xD7"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: m === 0 ? "var(--bad)" : m >= 5 ? "var(--good)" : "var(--ink-3)" } }, m === 0 ? "0\xD7 (failed)" : m >= 10 ? `${m}\xD7 unicorn` : `${m}\xD7`), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, textAlign: "right", color: returned > stake ? "var(--good)" : returned > 0 ? "var(--ink-2)" : "var(--bad)", fontWeight: 600 } }, "$", (returned / 1e3).toFixed(0), "k"));
+    })), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25C6" }, /* @__PURE__ */ React.createElement("strong", null, "Skill vs. luck."), " Your grade is the EV column \u2014 allocating toward high-EV startups (Holocene, Vellichor, Sundial) is the skill. But this single roll could land anywhere: a high-EV bet still fails most of the time, and a long-shot like Drachma occasionally 20\xD7's. Replay it and the realised number will jump around while the EV stays put. That variance is why a real fund spreads across many positive-EV bets rather than staking everything on the one that looks obvious."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 16 } }, /* @__PURE__ */ React.createElement(Button, { variant: "ghost", onClick: () => {
+      setOutcomes(null);
+      setPhase("allocate");
+    } }, "\u21BB Replay (new roll)"), /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: onComplete }, "Back to lab \u2192")));
+  }
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 VC Portfolio \xB7 Allocate", title: `Remaining: $${(remaining * 100 / 1e4).toFixed(0)}M of $10M`, accent: "var(--gold)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, VCPool.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, style: { padding: "14px 16px", borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "serif", style: { fontSize: 18, fontWeight: 600 } }, s.name, " ", /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 12, color: "var(--ink-3)" } }, "(", s.sector, ")")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "var(--ink-3)", marginTop: 2 } }, s.signals.join(" \xB7 "))), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 18, fontWeight: 600 } }, "$", (allocs[s.id] / 10).toFixed(1), "k ", /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "\xB7", (allocs[s.id] / total * 100).toFixed(0), "%"))), /* @__PURE__ */ React.createElement("input", { type: "range", min: "0", max: Math.min(total, allocs[s.id] + remaining), step: 50, value: allocs[s.id], onChange: (e) => setAlloc(s.id, +e.target.value) })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 } }, /* @__PURE__ */ React.createElement("span", { className: "mono", style: { fontSize: 13, color: "var(--ink-3)" } }, remaining === 0 ? "\u2713 Fully allocated" : `$${(remaining * 100 / total).toFixed(0)}M unallocated \u2014 allocate all of it to continue`), /* @__PURE__ */ React.createElement(Button, { size: "lg", disabled: remaining !== 0, onClick: resolve }, "Lock portfolio \xB7 10-year jump \u2192")));
+};
+const StationInspector = ({ onComplete, recordScore }) => {
+  const populations = React.useMemo(() => {
+    const rng = mulberry32(13);
+    const legit = Array.from({ length: 9900 }).map(() => Math.max(0, Math.min(100, 30 + gauss(rng) * 12)));
+    const fraud = Array.from({ length: 100 }).map(() => Math.max(0, Math.min(100, 70 + gauss(rng) * 15)));
+    return { legit, fraud };
+  }, []);
+  const [threshold, setThreshold] = React.useState(50);
+  const [phase, setPhase] = React.useState("intro");
+  const tp = populations.fraud.filter((s) => s >= threshold).length;
+  const fn = populations.fraud.length - tp;
+  const fp = populations.legit.filter((s) => s >= threshold).length;
+  const tn = populations.legit.length - fp;
+  const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+  const recall = tp / populations.fraud.length;
+  const cost = fp * 10 + fn * 500;
+  const baselineCost = populations.fraud.length * 500;
+  const savings = baselineCost - cost;
+  const savingsAt = (t) => {
+    const fpT = populations.legit.filter((s) => s >= t).length;
+    const fnT = populations.fraud.filter((s) => s < t).length;
+    return baselineCost - (fpT * 10 + fnT * 500);
+  };
+  const resolve = () => {
+    recordScore("inspector", { threshold, tp, fp, fn, savings });
+    setPhase("done");
+  };
+  if (phase === "intro") {
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Inspector", title: "Tune the fraud detector.", accent: "var(--leaf)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25D4" }, "Your bank uses a fraud-detection model that assigns each of 10,000 daily transactions a score from 0\u2013100. ", /* @__PURE__ */ React.createElement("strong", null, "You choose the threshold"), ": transactions \u2265 threshold get flagged.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("strong", null, "Costs:"), " each false positive costs $10 (human review). Each missed fraud (false negative) costs $500. Each caught fraud saves $500. There are 100 fraudulent transactions among 9,900 legit ones."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => setPhase("tune") }, "Tune the threshold \u2192")));
+  }
+  if (phase === "done") {
+    const ts = Array.from({ length: 86 }, (_, i) => i + 10);
+    const curve = ts.map((t) => ({ t, s: savingsAt(t) }));
+    const best = curve.reduce((a, b) => b.s > a.s ? b : a, curve[0]);
+    const sMax = Math.max(...curve.map((c) => c.s));
+    const sMin = Math.min(...curve.map((c) => c.s), 0);
+    const W = 540, H = 200, padL = 44, padR = 16, padT = 16, padB = 28;
+    const sx = (t) => padL + (t - 10) / (95 - 10) * (W - padL - padR);
+    const sy = (s) => padT + (1 - (s - sMin) / (sMax - sMin || 1)) * (H - padT - padB);
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Inspector \xB7 Resolved", title: `Threshold = ${threshold} \xB7 Savings: $${savings.toLocaleString()}`, accent: "var(--leaf)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "True positives", value: tp.toString(), tone: "good" }), /* @__PURE__ */ React.createElement(Stat, { label: "False positives", value: fp.toString(), tone: "neutral", sub: "alerted but legit" }), /* @__PURE__ */ React.createElement(Stat, { label: "Missed fraud", value: fn.toString(), tone: "bad" }), /* @__PURE__ */ React.createElement(Stat, { label: "Net savings", value: `$${(savings / 1e3).toFixed(1)}k`, tone: savings > 3e4 ? "good" : "neutral", sub: `vs. do-nothing baseline` })), /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 18px", borderRadius: 14, background: "var(--bg-soft)", border: "1px solid var(--line)", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em", marginBottom: 8 } }, "net savings vs. threshold"), /* @__PURE__ */ React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", style: { maxHeight: H } }, /* @__PURE__ */ React.createElement("line", { x1: padL, x2: W - padR, y1: sy(0), y2: sy(0), stroke: "var(--line-2)", strokeWidth: "1" }), /* @__PURE__ */ React.createElement("text", { x: padL - 6, y: sy(0) + 3, textAnchor: "end", fontSize: "9", fill: "var(--ink-4)", className: "mono" }, "$0"), /* @__PURE__ */ React.createElement("text", { x: padL - 6, y: sy(sMax) + 3, textAnchor: "end", fontSize: "9", fill: "var(--ink-4)", className: "mono" }, "$", (sMax / 1e3).toFixed(0), "k"), /* @__PURE__ */ React.createElement(
+      "polyline",
+      {
+        fill: "none",
+        stroke: "var(--leaf)",
+        strokeWidth: "2.5",
+        points: curve.map((c) => `${sx(c.t)},${sy(c.s)}`).join(" ")
+      }
+    ), /* @__PURE__ */ React.createElement("line", { x1: sx(best.t), x2: sx(best.t), y1: padT, y2: H - padB, stroke: "var(--good)", strokeWidth: "1.5", strokeDasharray: "3 3" }), /* @__PURE__ */ React.createElement("circle", { cx: sx(best.t), cy: sy(best.s), r: "4", fill: "var(--good)" }), /* @__PURE__ */ React.createElement("text", { x: sx(best.t), y: padT - 2, textAnchor: "middle", fontSize: "10", fill: "var(--good)", className: "mono" }, "optimum @ ", best.t), /* @__PURE__ */ React.createElement("line", { x1: sx(threshold), x2: sx(threshold), y1: padT, y2: H - padB, stroke: "var(--ink)", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("circle", { cx: sx(threshold), cy: sy(savings), r: "4", fill: "var(--ink)" }), /* @__PURE__ */ React.createElement("text", { x: sx(threshold), y: H - padB + 16, textAnchor: "middle", fontSize: "10", fill: "var(--ink)", className: "mono" }, "you: ", threshold), /* @__PURE__ */ React.createElement("text", { x: padL, y: H - 6, fontSize: "9", fill: "var(--ink-4)", className: "mono" }, "10"), /* @__PURE__ */ React.createElement("text", { x: W - padR, y: H - 6, textAnchor: "end", fontSize: "9", fill: "var(--ink-4)", className: "mono" }, "95")), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-3)", marginTop: 6 } }, "The best threshold here is ~", best.t, " (saving $", (best.s / 1e3).toFixed(1), "k). You chose ", threshold, ", leaving $", ((best.s - savings) / 1e3).toFixed(1), "k on the table.")), /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u25C6" }, /* @__PURE__ */ React.createElement("strong", null, "The trade-off:"), ' low threshold catches more fraud but produces many false alarms. High threshold is selective but lets fraud slip through. The "optimal" threshold depends on the relative costs. For these costs (FP=$10, FN=$500), the sweet spot sits around 45\u201355 \u2014 and the curve above is fairly flat across that range, which is why "roughly right" beats "precisely wrong."'), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: onComplete }, "Back to lab \u2192")));
+  }
+  const buckets = Array.from({ length: 50 }).map((_, i) => ({
+    x: i * 2,
+    legit: populations.legit.filter((s) => s >= i * 2 && s < (i + 1) * 2).length,
+    fraud: populations.fraud.filter((s) => s >= i * 2 && s < (i + 1) * 2).length
+  }));
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Inspector \xB7 Tune", title: "Score distributions", accent: "var(--leaf)" }, /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 18px", borderRadius: 14, background: "var(--bg-soft)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em", marginBottom: 8 } }, "10,000 transactions \xB7 score 0-100 \xB7 100 are fraud"), /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 540 200", width: "100%", style: { maxHeight: 200 } }, buckets.map((b, i) => {
+    const x = 30 + i * 10;
+    const lh = Math.min(b.legit / 60, 160);
+    const fh = b.fraud * 1.6;
+    return /* @__PURE__ */ React.createElement("g", { key: i }, /* @__PURE__ */ React.createElement("rect", { x, y: 170 - lh, width: "9", height: lh, fill: "var(--signal)", opacity: ".6" }), /* @__PURE__ */ React.createElement("rect", { x, y: 170 - lh - fh, width: "9", height: fh, fill: "var(--noise)", opacity: ".85" }));
+  }), /* @__PURE__ */ React.createElement("line", { x1: 30 + threshold * 5, x2: 30 + threshold * 5, y1: "20", y2: "180", stroke: "var(--ink)", strokeWidth: "2" }), /* @__PURE__ */ React.createElement("text", { x: 30 + threshold * 5, y: "14", textAnchor: "middle", fontSize: "11", fill: "var(--ink)", className: "mono" }, "threshold ", threshold), /* @__PURE__ */ React.createElement("text", { x: "30", y: "194", fontSize: "10", fill: "var(--ink-3)", className: "mono" }, "0"), /* @__PURE__ */ React.createElement("text", { x: "530", y: "194", fontSize: "10", fill: "var(--ink-3)", textAnchor: "end", className: "mono" }, "100"), /* @__PURE__ */ React.createElement("text", { x: "50", y: "34", fontSize: "10", fill: "var(--signal)", className: "mono" }, "\u25AA legit (9,900)"), /* @__PURE__ */ React.createElement("text", { x: "160", y: "34", fontSize: "10", fill: "var(--noise-2)", className: "mono" }, "\u25AA fraud (100)"))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, padding: "14px 18px", borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 8, color: "var(--ink-2)" } }, "Threshold (flag transactions \u2265 this score):"), /* @__PURE__ */ React.createElement("input", { type: "range", min: "10", max: "95", step: "1", value: threshold, onChange: (e) => setThreshold(+e.target.value) })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 14 } }, /* @__PURE__ */ React.createElement(Stat, { label: "Catches", value: `${tp}/100`, tone: tp >= 80 ? "good" : "neutral", sub: `recall ${Math.round(recall * 100)}%` }), /* @__PURE__ */ React.createElement(Stat, { label: "False alarms", value: fp.toString(), tone: fp < 200 ? "good" : fp < 500 ? "neutral" : "bad" }), /* @__PURE__ */ React.createElement(Stat, { label: "Misses", value: fn.toString(), tone: fn === 0 ? "good" : fn < 10 ? "neutral" : "bad" }), /* @__PURE__ */ React.createElement(Stat, { label: "Net savings", value: `$${(savings / 1e3).toFixed(1)}k`, tone: savings > 3e4 ? "good" : savings > 0 ? "neutral" : "bad" })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: resolve }, "Lock threshold \u2192")));
+};
+const WhistleCase = {
+  claim: "CEO has been falsifying revenue numbers for 3 quarters.",
+  prior: 0.08,
+  rumors: [
+    { id: 1, source: "Anonymous tip via internal Slack", reliability: 0.55, isIndependent: true, fits: 0.7, note: "A single anonymous tip is weak evidence \u2014 credibility unverified." },
+    { id: 2, source: "A junior analyst noticed unusual aged-receivables patterns", reliability: 0.75, isIndependent: true, fits: 0.85, note: "Specific, technical, independent \u2014 strong signal." },
+    { id: 3, source: "Three former employees independently raised concerns to HR", reliability: 0.7, isIndependent: false, fits: 0.8, note: 'WARNING: "three independent" \u2014 but all from the same exit-interview cohort that compared notes. Treat as ONE source.' },
+    { id: 4, source: "A short-seller research report citing the same anomalies", reliability: 0.6, isIndependent: false, fits: 0.75, note: "WARNING: short-sellers have financial incentive AND the report cites the analyst from rumor 2. Not independent." },
+    { id: 5, source: "A board member privately expressed concerns over dinner", reliability: 0.85, isIndependent: false, fits: 0.65, note: "WARNING: credible source, but the board member is only repeating rumors they'd heard second-hand \u2014 likely the same ones circulating above, not a fresh observation. Treat as part of the correlated cluster." }
+  ]
+};
+const rumorLR = (r) => (r.fits * r.reliability + (1 - r.fits) * (1 - r.reliability)) / ((1 - r.fits) * r.reliability + r.fits * (1 - r.reliability));
+const StationWhistle = ({ onComplete, recordScore }) => {
+  const [phase, setPhase] = React.useState("intro");
+  const [investigated, setInvestigated] = React.useState({});
+  const [finalProb, setFinalProb] = React.useState(50);
+  const investigate = (id) => setInvestigated((prev) => ({ ...prev, [id]: true }));
+  const allInvestigated = WhistleCase.rumors.every((r) => investigated[r.id]);
+  const optimalPosterior = React.useMemo(() => {
+    let odds = WhistleCase.prior / (1 - WhistleCase.prior);
+    const independent = WhistleCase.rumors.filter((r) => r.isIndependent);
+    const correlatedGroup = WhistleCase.rumors.filter((r) => !r.isIndependent);
+    for (const r of independent) odds *= rumorLR(r);
+    if (correlatedGroup.length > 0) {
+      const best = correlatedGroup.slice().sort((a, b) => b.reliability * b.fits - a.reliability * a.fits)[0];
+      odds *= rumorLR(best);
+    }
+    return odds / (1 + odds);
+  }, []);
+  const lockPosterior = () => {
+    const finalProbDec = finalProb / 100;
+    const gap = Math.abs(finalProbDec - optimalPosterior);
+    recordScore("whistle", { finalProb: finalProbDec, optimal: optimalPosterior, gap });
+    setPhase("final");
+  };
+  if (phase === "intro") {
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Whistleblower", title: WhistleCase.claim, accent: "var(--noise-2)" }, /* @__PURE__ */ React.createElement(Callout, { tone: "signal", icon: "\u26A0" }, "You're an internal investigator. Five rumors have surfaced. Each has different reliability \u2014 and crucially, some are ", /* @__PURE__ */ React.createElement("strong", null, "correlated"), " (the sources talked to each other). ", /* @__PURE__ */ React.createElement("strong", null, "Investigate each source"), " to trace where it really came from, then commit to a probability the claim is true."), /* @__PURE__ */ React.createElement("p", { style: { color: "var(--ink-2)", marginTop: 12 } }, "The trap: weighting correlated evidence as if it were independent will dramatically over-update your belief. The skill is tracing the source \u2014 so do that ", /* @__PURE__ */ React.createElement("em", null, "before"), " you decide."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: () => setPhase("eval") }, "Review rumors \u2192")));
+  }
+  if (phase === "final") {
+    const finalProbDec = finalProb / 100;
+    const gap = Math.abs(finalProbDec - optimalPosterior);
+    return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Whistleblower \xB7 Resolved", title: "How you weighted the evidence.", accent: "var(--noise-2)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 22px", borderRadius: 14, background: "var(--bg-card)", border: "1.5px solid var(--ink)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "your posterior"), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 32, fontWeight: 600 } }, finalProb, "%")), /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 22px", borderRadius: 14, background: "var(--leaf-soft)", border: "1.5px solid var(--leaf)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--good)", textTransform: "uppercase", letterSpacing: ".14em" } }, "optimal (correlation-aware)"), /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 32, fontWeight: 600 } }, Math.round(optimalPosterior * 100), "%"))), /* @__PURE__ */ React.createElement(Callout, { tone: gap < 0.15 ? "good" : gap < 0.3 ? "gold" : "noise", icon: gap < 0.15 ? "\u2713" : gap < 0.3 ? "\u25D1" : "\u2717" }, /* @__PURE__ */ React.createElement("strong", null, "Gap from optimal: ", Math.round(gap * 100), " points."), " ", gap < 0.15 ? "Sharp evaluation \u2014 you correctly down-weighted the correlated cluster." : gap < 0.3 ? "Reasonable, but the correlated rumors likely got more weight than they should have." : `You probably treated rumors 3, 4 and 5 as independent confirmations. They're not \u2014 they all trace back to the same circulating story. Several "independent" sources who really heard the same thing count as roughly one.`), /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bg-card)", border: "1px solid var(--line)", borderRadius: 14, marginTop: 14, overflow: "hidden" } }, WhistleCase.rumors.map((r, i) => /* @__PURE__ */ React.createElement("div", { key: r.id, style: { display: "flex", gap: 12, padding: "12px 16px", borderBottom: i < WhistleCase.rumors.length - 1 ? "1px solid var(--line)" : "none", background: r.isIndependent ? "transparent" : "var(--noise-soft)" } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { flex: "0 0 80px", fontSize: 12, fontWeight: 600, color: r.isIndependent ? "var(--good)" : "var(--bad)" } }, r.isIndependent ? "INDEP" : "CORRELATED"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 13.5, color: "var(--ink-2)" } }, r.source, /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--ink-3)", fontStyle: "italic" } }, r.note))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", onClick: onComplete }, "Back to lab \u2192")));
+  }
+  return /* @__PURE__ */ React.createElement(Panel, { eyebrow: "Simulation \xB7 Whistleblower \xB7 Evaluate", title: "Five rumors. Trace each one before you weigh it.", accent: "var(--noise-2)" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, WhistleCase.rumors.map((r) => {
+    const seen = investigated[r.id];
+    return /* @__PURE__ */ React.createElement("div", { key: r.id, style: { padding: "14px 16px", borderRadius: 12, background: "var(--bg-card)", border: `1px solid ${seen ? r.isIndependent ? "var(--leaf)" : "var(--noise)" : "var(--line)"}` } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 500 } }, "Rumor ", r.id, ": ", r.source), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flex: "0 0 auto" } }, /* @__PURE__ */ React.createElement(Chip, { tone: "neutral" }, "reliability ~", Math.round(r.reliability * 100), "%"), seen ? /* @__PURE__ */ React.createElement(Chip, { tone: r.isIndependent ? "leaf" : "noise" }, r.isIndependent ? "independent" : "correlated") : /* @__PURE__ */ React.createElement(Button, { size: "sm", variant: "soft", onClick: () => investigate(r.id) }, "Investigate source"))), seen && /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { marginTop: 8, fontSize: 13, color: "var(--ink-3)", fontStyle: "italic", lineHeight: 1.5 } }, r.note));
+  })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 18, padding: "16px 20px", borderRadius: 14, background: "var(--bg-soft)", border: "1px solid var(--line)", opacity: allInvestigated ? 1 : 0.5 } }, /* @__PURE__ */ React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--ink-4)", textTransform: "uppercase", letterSpacing: ".14em" } }, "prior P(true) before any rumor: ", Math.round(WhistleCase.prior * 100), "%"), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, color: "var(--ink-2)" } }, allInvestigated ? "Given the rumors \u2014 and where they actually came from \u2014 your posterior P(claim is true)?" : "Investigate all five sources first, then set your posterior."), /* @__PURE__ */ React.createElement(ProbabilitySlider, { value: finalProb, onChange: setFinalProb, lowLabel: "false", highLabel: "true" })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 18 } }, /* @__PURE__ */ React.createElement(Button, { size: "lg", disabled: !allInvestigated, onClick: lockPosterior }, "Lock posterior \u2192")));
+};
+Object.assign(window, { StationTrial, StationVC, StationInspector, StationWhistle });
+
+</script>
+<script>
+
+(function(){
+  var COMP = window["StationTrial"];
+  var EXTRA = {};
+  var h = React.createElement;
+  function Header(){
+    return h('div',{style:{position:'sticky',top:0,zIndex:50,backdropFilter:'blur(16px) saturate(150%)',background:'rgba(241,236,222,.78)',borderBottom:'1px solid var(--line)'}},
+      h('div',{style:{maxWidth:1320,margin:'0 auto',padding:'12px 24px',display:'flex',alignItems:'center',gap:16}},
+        h('a',{href:'../',className:'btn',style:{display:'flex',alignItems:'center',gap:10,background:'transparent',padding:0,textDecoration:'none'}},
+          h('svg',{width:30,height:30,viewBox:'0 0 34 34'},
+            h('circle',{cx:17,cy:17,r:16,fill:'var(--ink)'}),
+            h('path',{d:'M3 19 Q 7 11, 11 19 T 19 19 T 27 19 T 31 19',fill:'none',stroke:'var(--noise)',strokeWidth:1.4,strokeLinecap:'round',opacity:.8}),
+            h('path',{d:'M 5 17 L 11 17 L 14 9 L 20 25 L 23 17 L 29 17',fill:'none',stroke:'var(--bg-card)',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'})
+          ),
+          h('div',{style:{display:'flex',flexDirection:'column',alignItems:'flex-start',lineHeight:1.05}},
+            h('span',{className:'serif',style:{fontWeight:600,letterSpacing:'-.02em',fontSize:18,color:'var(--ink)'}},'Signal & Noise Lab'),
+            h('span',{className:'serif',style:{fontSize:10.5,fontStyle:'italic',color:'var(--ink-3)',fontWeight:400}},'Maxted Neal')
+          )
+        ),
+        h('div',{style:{flex:1}}),
+        h('span',{className:'mono',style:{fontSize:12,color:'var(--ink-3)'}}, "Trial Lawyer"),
+        h('a',{href:'../',className:'btn',style:{padding:'8px 14px',borderRadius:999,fontSize:13,fontWeight:500,background:'var(--bg-soft)',color:'var(--ink-2)',border:'1px solid var(--line-2)',textDecoration:'none'}},'↩ All sims')
+      )
+    );
+  }
+  function Page(){
+    var st = React.useState(0), k = st[0], setK = st[1];
+    function record(id,data){ window.__lastScore={id:id,data:data}; try{console.log('[score]',id,data);}catch(e){} }
+    function done(){ setK(k+1); window.scrollTo({top:0}); }
+    return h('div',{className:'shell paper'},
+      h(Header,null),
+      h('div',{style:{flex:1}},
+        h('div',{style:{maxWidth:980,margin:'0 auto',padding:'40px 28px 80px'}},
+          COMP ? h(COMP, Object.assign({key:k, onComplete:done, recordScore:record}, EXTRA))
+               : h('div',{style:{padding:40,color:'var(--bad)'}},'Component StationTrial failed to load.')
+        )
+      )
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Page));
+})();
+
+</script>
+</body>
+</html>

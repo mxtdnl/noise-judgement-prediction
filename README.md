@@ -1,25 +1,128 @@
-# CODING AGENTS: READ THIS FIRST
+# Signal &amp; Noise Lab
 
-This is a **handoff bundle** from Claude Design (claude.ai/design).
+A collection of **20 standalone forecasting exercises** for teaching non-statistics
+undergraduates the core ideas behind good judgement under uncertainty: signal vs.
+noise, calibration, Brier scoring, base rates, Bayesian updating, aggregation, and
+decision-making under information.
 
-A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
+Each exercise is its own self-contained web page, hosted together on GitHub Pages
+with a hub that links them all. Built by _Maxted Neal_.
 
-## What you should do — IMPORTANT
+**Live site:** `https://<your-username>.github.io/noise-judgement-prediction/`
 
-**Read the chat transcripts first.** There are 2 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+---
 
-**Read `project/Signal & Noise Lab.html` in full.** The user had this file open when they triggered the handoff, so it's almost certainly the primary design they want built. Read it top to bottom — don't skim. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+## What's here
 
-**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
+| Group | Exercises |
+|---|---|
+| **Core stations** | Spot the Signal · Calibration Quiz · Brier Arena · Base Rate Trap · Bayesian Theater · Wisdom of Crowds |
+| **Quick drills** | Forecaster's Tournament · Drift Detector · Anchoring Lab · Versus the Crowd |
+| **Domain sims** | Election Night · Outbreak Tracker · A/B Test Director · Hiring Roulette |
+| **Decision sims** | Detective · Trial Lawyer · Stock Picker · VC Portfolio · Inspector · Whistleblower |
 
-## About the design files
+Each page renders a single React component with a light chrome (title + a link back
+to the hub). There is **no cross-page state, login, or backend** — a page is a page.
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+## How it's built
 
-**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
+The exercises are authored as JSX in `src/` and compiled to plain browser JavaScript
+by a small [esbuild](https://esbuild.github.io/)-based script. There is **no bundler
+and no CDN dependency at runtime** — React is vendored into the repo, so every page
+works offline and is immune to third-party CDN outages.
 
-## Bundle contents
+```
+repo/
+  src/                     ← editable source (the source of truth)
+    ui.jsx                 ← shared UI atoms (Button, Panel, sliders, …)
+    charts.jsx             ← chart/visualisation helpers + seeded RNG
+    stations.jsx           ← the 6 core stations
+    sims-drills.jsx        ← tournament · drift · anchor · versus-the-crowd
+    sims-domain.jsx        ← election · outbreak · a/b-test · hiring
+    sims-decision.jsx      ← trial · vc · inspector · whistleblower
+    games.jsx              ← election · detective · stock picker
+    shared/
+      theme.css            ← design tokens + base styles (warm / cool / dark)
+      vendor/              ← React + ReactDOM UMD (vendored, committed)
+  build.mjs                ← transpiles src → docs (one self-contained page each)
+  docs/                    ← BUILD OUTPUT — the GitHub Pages site (committed)
+    index.html             ← hub
+    <exercise>/index.html  ← one page per exercise
+    shared/                ← vendored React, copied at build time
+  design-source/           ← original Claude Design prototype + chat transcripts (provenance)
+```
 
-- `README.md` — this file
-- `chats/` — conversation transcripts (read these!)
-- `project/` — the `Noise` project files (HTML prototypes, assets, components)
+### Build
+
+```bash
+npm install      # dev-only: esbuild (React is already vendored in src/shared/vendor)
+npm run build    # transpiles src/ → docs/
+```
+
+`docs/` is committed so the site deploys without a CI build step. Re-run `npm run build`
+after editing anything in `src/` and commit the regenerated `docs/`.
+
+### Deploy (GitHub Pages)
+
+Settings → **Pages** → Source: **Deploy from a branch** → Branch: **`main`**, folder:
+**`/docs`**. The hub is served at the repo root URL; each exercise lives at
+`/<exercise>/`. A `.nojekyll` file is emitted so paths starting with `_` or `shared/`
+are served verbatim.
+
+## Editing content
+
+Question banks, likelihood ratios, and scenario curves live inline at the top of each
+component file (e.g. `TournamentQuestions`, `BrierEvents`, `HiringPool`). Swapping in
+your own course-specific items is usually a one-array edit followed by `npm run build`.
+
+---
+
+## Changes from the original prototype
+
+This build is a from-scratch re-implementation of the Claude Design prototype (kept in
+`design-source/` for reference), stripped down to the simulations and re-issued as
+standalone pages, with an adversarial review's worth of correctness and pedagogy fixes:
+
+**Correctness**
+- Calibration: fixed a double-counted final question; replaced a contested item
+  (Nile/Amazon) with a clean one (Australia vs. Greenland).
+- Wisdom of Crowds: corrected an inverted percentage and reframed the reveal to teach
+  when a crowd's _shared bias_ makes aggregation fail.
+- Moved `recordScore` out of render in Hiring, VC, Inspector, and Whistleblower
+  (these were calling a parent state setter during a child's render).
+- Forecaster's Tournament: corrected the Russia-vs-Pluto item and rebalanced the
+  question set to 6 true / 6 false so "always say true" scores at chance.
+
+**Pedagogy / modelling**
+- Calibration uses a 50–100% half-range slider (it's a 2-alternative forced choice) and
+  flags the small-sample caveat on the curve.
+- Brier Arena notes that "optimal" minimises _expected_ Brier, not any single outcome.
+- Bayesian Theater adds a prediction-then-reveal assessment phase and states the
+  conditional-independence assumption behind multiplying likelihood ratios.
+- Election Night and Outbreak Tracker are graded against a **reference Bayesian
+  forecaster trajectory** (what you should have believed given the data so far), not the
+  single realised outcome — so a lucky early "100%" scores badly.
+- A/B Test Director grades the _process_ (the disciplined call at each decision point),
+  shows a 95% CI on the lift, and reveals the eventual outcome to make the
+  process-vs-resulting distinction explicit.
+- Anchoring Lab now uses a balanced high/low design and measures the anchoring _effect_
+  (mean log-deviation gap between conditions) instead of a knowledge-confounded raw
+  correlation.
+- VC Portfolio resolves each startup from a real outcome _distribution_ and grades on the
+  expected value of your allocation (skill) while showing the realised draw (luck).
+- Whistleblower adds an "investigate source" step so provenance is visible _before_ you
+  commit, and correctly treats the hearsay rumor as part of the correlated cluster.
+- Inspector adds a savings-vs-threshold curve; Trial Lawyer adds independence and
+  prior-framing caveats; Stock Picker is reframed as an explicit even-money directional
+  contract (payoff is ±stake on direction, not the size of the move).
+
+## Known limitations
+
+- **Fixed random seeds.** Most exercises use fixed seeds, so answers are memorisable and
+  shareable between cohorts. This is acceptable for projected, whole-class use; a future
+  version could parameterise the seed via a URL query.
+- **"Hard" difficulty (Spot the Signal only)** multiplies noise without changing the
+  answer key.
+- **No persistence or integrated report.** These standalone pages intentionally drop the
+  original app's localStorage progress and the cross-station lab report. Restoring an
+  integrated "lab" view as its own page is possible future work.

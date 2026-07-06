@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Signal & Noise Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+    :root{
+      --bg:#F1ECDE;
+      --bg-card:#FFFDF6;
+      --bg-soft:#EBE4D2;
+      --ink:#1A1814;
+      --ink-2:#3C372E;
+      --ink-3:#6B6457;
+      --ink-4:#9A917F;
+      --line:#E2D9C2;
+      --line-2:#D2C7A8;
+      --signal:#1E5F70;
+      --signal-2:#2A8295;
+      --signal-soft:#D6E6E9;
+      --noise:#E66B3D;
+      --noise-2:#CA5430;
+      --noise-soft:#F7DBCB;
+      --gold:#C99425;
+      --gold-soft:#F2E2B5;
+      --leaf:#5A7A3D;
+      --leaf-soft:#DBE5C7;
+      --bad:#B6402A;
+      --good:#3F7A4A;
+      --r-sm:8px; --r-md:14px; --r-lg:22px; --r-xl:32px;
+      --shadow-sm:0 1px 0 rgba(0,0,0,.04), 0 1px 2px rgba(46,38,20,.06);
+      --shadow-md:0 1px 0 rgba(255,253,246,.7) inset, 0 1px 0 rgba(0,0,0,.04), 0 6px 18px rgba(46,38,20,.08);
+      --shadow-lg:0 1px 0 rgba(255,253,246,.7) inset, 0 8px 32px rgba(46,38,20,.14);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+      font-family:"Geist","Geist Fallback",ui-sans-serif,system-ui,sans-serif;
+      font-feature-settings:"ss01","ss02","cv11";
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+    body{min-height:100vh;overflow-x:hidden}
+    .serif{font-family:"Newsreader",ui-serif,Georgia,serif; font-weight:500; letter-spacing:-.01em}
+    .mono{font-family:"Geist Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+    button{font-family:inherit; color:inherit}
+    a{color:inherit}
+
+    /* paper texture */
+    .paper{
+      background:
+        radial-gradient(1200px 600px at 90% -10%, rgba(201,148,37,.06), transparent 60%),
+        radial-gradient(900px 500px at -10% 110%, rgba(30,95,112,.06), transparent 55%),
+        var(--bg);
+    }
+
+    /* generic */
+    .card{background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-md)}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid var(--line-2); background:var(--bg-card); color:var(--ink-2)}
+    .kbd{font-family:"Geist Mono",monospace; font-size:11px; padding:2px 6px; border-radius:5px; background:var(--bg-soft); border:1px solid var(--line-2); color:var(--ink-2)}
+
+    /* button reset for our React Button */
+    .btn{appearance:none; border:0; cursor:pointer; transition:transform .12s ease, box-shadow .2s ease, background .2s ease}
+    .btn:active{transform:translateY(1px)}
+
+    /* slider track */
+    input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:36px; background:transparent; cursor:pointer}
+    input[type=range]:focus{outline:none}
+    input[type=range]::-webkit-slider-runnable-track{height:8px; border-radius:999px; background:var(--bg-soft); border:1px solid var(--line)}
+    input[type=range]::-moz-range-track{height:8px; border-radius:999px; background:var(--bg-soft); border:1px solid var(--line)}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%; background:var(--ink); border:3px solid #FFFDF6; box-shadow:0 2px 8px rgba(0,0,0,.18); margin-top:-10px}
+    input[type=range]::-moz-range-thumb{width:24px; height:24px; border-radius:50%; background:var(--ink); border:3px solid #FFFDF6; box-shadow:0 2px 8px rgba(0,0,0,.18)}
+
+    /* scrollbar */
+    ::-webkit-scrollbar{width:10px; height:10px}
+    ::-webkit-scrollbar-thumb{background:rgba(60,55,46,.25); border-radius:8px; border:2px solid transparent; background-clip:content-box}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(60,55,46,.4); background-clip:content-box; border:2px solid transparent}
+
+    /* layout */
+    .shell{min-height:100vh; display:flex; flex-direction:column}
+    .topbar{position:sticky; top:0; z-index:50; backdrop-filter:blur(16px) saturate(150%); background:rgba(241,236,222,.78); border-bottom:1px solid var(--line)}
+
+    /* animations */
+    @keyframes fadeUp{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+    .fadeup{animation:fadeUp .35s ease-out both}
+    @keyframes pop{from{transform:scale(.94); opacity:0} to{transform:scale(1); opacity:1}}
+    .pop{animation:pop .25s cubic-bezier(.2,.9,.3,1.2) both}
+    @keyframes pulse{0%,100%{opacity:.8} 50%{opacity:.35}}
+    .pulse{animation:pulse 1.6s ease-in-out infinite}
+
+    /* sr-only */
+    .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* dark variant overrides applied through .theme-dark wrapper */
+    .theme-dark{
+      --bg:#16140F; --bg-card:#201D17; --bg-soft:#2A2620; --ink:#F2EBD8; --ink-2:#D7CFB8;
+      --ink-3:#9B9279; --ink-4:#6C6552; --line:#332E25; --line-2:#3F392E;
+      --signal-soft:#163942; --noise-soft:#3C2418; --gold-soft:#3B2F11; --leaf-soft:#293321;
+    }
+    .theme-dark .paper{background:
+      radial-gradient(1200px 600px at 90% -10%, rgba(201,148,37,.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(42,130,149,.10), transparent 55%),
+      var(--bg);}
+    .theme-dark input[type=range]::-webkit-slider-thumb{background:#F2EBD8; border-color:#201D17}
+    .theme-dark .topbar{background:rgba(22,20,15,.78)}
+
+    /* cool variant */
+    .theme-cool{
+      --bg:#ECEEF1; --bg-card:#FFFFFF; --bg-soft:#E1E5EA; --ink:#11161D; --ink-2:#2D343F;
+      --ink-3:#5B6471; --ink-4:#8A93A1; --line:#D8DDE3; --line-2:#C5CCD4;
+      --signal:#1C5BBE; --signal-2:#3D7DDF; --signal-soft:#D7E4F7;
+      --noise:#D24A6B; --noise-2:#B53757; --noise-soft:#F4D6DF;
+      --gold:#A6822D; --gold-soft:#EFE0BA; --leaf:#3A7A6A; --leaf-soft:#D0E4DC;
+    }
+
+.wrap{max-width:1240px;margin:0 auto;padding:56px 28px 90px}
+.hero-h{margin:0;font-size:clamp(40px,7vw,64px);line-height:1.02;letter-spacing:-.03em;max-width:900px}
+.hero-p{font-size:19px;color:var(--ink-2);max-width:680px;margin-top:18px;line-height:1.5}
+.group{margin-top:56px}
+.group-h{font-size:30px;margin:0 0 18px;letter-spacing:-.015em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px;text-decoration:none;
+  padding:22px 22px 18px;border-radius:20px;background:var(--bg-card);border:1px solid var(--line);
+  box-shadow:var(--shadow-sm);min-height:170px;transition:transform .15s ease,box-shadow .2s ease}
+.tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+.tile-top{position:absolute;top:0;left:22px;right:22px;height:3px;background:var(--c);border-radius:0 0 4px 4px}
+.tile-kicker{font-family:"Geist Mono",monospace;font-size:11px;color:var(--ink-4);letter-spacing:.16em;margin-top:4px}
+.tile-title{font-family:"Newsreader",serif;font-weight:600;font-size:22px;color:var(--ink);line-height:1.15;margin-top:2px}
+.tile-blurb{font-size:14px;color:var(--ink-3);line-height:1.4;flex:1}
+.tile-concept{font-family:"Geist Mono",monospace;font-size:10.5px;color:var(--ink-4);text-transform:uppercase;letter-spacing:.12em;margin-top:10px}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.brand-t{font-family:"Newsreader",serif;font-weight:600;font-size:22px;letter-spacing:-.02em}
+.brand-s{font-family:"Newsreader",serif;font-size:11px;font-style:italic;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="shell paper">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="36" height="36" viewBox="0 0 34 34"><circle cx="17" cy="17" r="16" fill="var(--ink)"/><path d="M3 19 Q 7 11, 11 19 T 19 19 T 27 19 T 31 19" fill="none" stroke="var(--noise)" stroke-width="1.4" stroke-linecap="round" opacity=".8"/><path d="M 5 17 L 11 17 L 14 9 L 20 25 L 23 17 L 29 17" fill="none" stroke="var(--bg-card)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div style="display:flex;flex-direction:column;line-height:1.1"><span class="brand-t">Signal &amp; Noise Lab</span><span class="brand-s">Maxted Neal</span></div>
+    </div>
+    <h1 class="serif hero-h">Learn to <em>see</em> through the noise.</h1>
+    <p class="hero-p">A collection of standalone forecasting exercises for non-stats undergrads. Each one is a self-contained game on a single skill — signal vs. noise, calibration, Bayesian updating, aggregation, and decision-making under uncertainty. Pick any to begin.</p>
+    
+      <section class="group">
+        <h2 class="serif group-h">Core stations</h2>
+        <div class="grid">
+        <a class="tile" href="signal/" style="--c:var(--noise)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">STATION 01</span>
+          <span class="tile-title">Spot the Signal</span>
+          <span class="tile-blurb">Tell trends from noise</span>
+          <span class="tile-concept">Signal vs. noise</span>
+        </a>
+        <a class="tile" href="calibration/" style="--c:var(--signal)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">STATION 02</span>
+          <span class="tile-title">Calibration Quiz</span>
+          <span class="tile-blurb">How sure are you, really?</span>
+          <span class="tile-concept">Confidence calibration</span>
+        </a>
+        <a class="tile" href="brier/" style="--c:var(--gold)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">STATION 03</span>
+          <span class="tile-title">Brier Arena</span>
+          <span class="tile-blurb">Probabilities, scored</span>
+          <span class="tile-concept">Brier scoring rule</span>
+        </a>
+        <a class="tile" href="base-rate/" style="--c:var(--noise-2)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">STATION 04</span>
+          <span class="tile-title">Base Rate Trap</span>
+          <span class="tile-blurb">The 1%-disease puzzle</span>
+          <span class="tile-concept">Priors & base rates</span>
+        </a>
+        <a class="tile" href="bayes/" style="--c:var(--signal-2)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">STATION 05</span>
+          <span class="tile-title">Bayesian Theater</span>
+          <span class="tile-blurb">Move beliefs with evidence</span>
+          <span class="tile-concept">Bayesian updating</span>
+        </a>
+        <a class="tile" href="crowd/" style="--c:var(--leaf)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">STATION 06</span>
+          <span class="tile-title">Wisdom of Crowds</span>
+          <span class="tile-blurb">You vs. the aggregate</span>
+          <span class="tile-concept">Aggregation & sample size</span>
+        </a></div>
+      </section>
+      <section class="group">
+        <h2 class="serif group-h">Quick drills</h2>
+        <div class="grid">
+        <a class="tile" href="tournament/" style="--c:var(--gold)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Forecaster's Tournament</span>
+          <span class="tile-blurb">Rapid probability calls, scored by Brier</span>
+          <span class="tile-concept">Brier scoring · calibration</span>
+        </a>
+        <a class="tile" href="drift/" style="--c:var(--noise)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Drift Detector</span>
+          <span class="tile-blurb">Mark where a time series shifts</span>
+          <span class="tile-concept">Change-point detection</span>
+        </a>
+        <a class="tile" href="anchor/" style="--c:var(--gold)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Anchoring Lab</span>
+          <span class="tile-blurb">Measure your own anchoring bias</span>
+          <span class="tile-concept">Anchoring · cognitive bias</span>
+        </a>
+        <a class="tile" href="crowd-vs/" style="--c:var(--leaf)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Versus the Crowd</span>
+          <span class="tile-blurb">Update toward the crowd · or not</span>
+          <span class="tile-concept">Aggregation · independence</span>
+        </a></div>
+      </section>
+      <section class="group">
+        <h2 class="serif group-h">Domain sims</h2>
+        <div class="grid">
+        <a class="tile" href="election/" style="--c:var(--signal)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Election Night</span>
+          <span class="tile-blurb">Update P(D wins) as precincts report</span>
+          <span class="tile-concept">Sequential Bayes · sample size</span>
+        </a>
+        <a class="tile" href="outbreak/" style="--c:var(--noise)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Outbreak Tracker</span>
+          <span class="tile-blurb">Forecast an epidemic peak in real time</span>
+          <span class="tile-concept">Exponential growth · updates</span>
+        </a>
+        <a class="tile" href="ab-test/" style="--c:var(--signal)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">A/B Test Director</span>
+          <span class="tile-blurb">STOP / KEEP / SHIP on partial data</span>
+          <span class="tile-concept">Testing · stopping rules</span>
+        </a>
+        <a class="tile" href="hiring/" style="--c:var(--signal-2)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Hiring Roulette</span>
+          <span class="tile-blurb">Read 12 candidates with budget for 5</span>
+          <span class="tile-concept">Signal extraction · base rates</span>
+        </a></div>
+      </section>
+      <section class="group">
+        <h2 class="serif group-h">Decision sims</h2>
+        <div class="grid">
+        <a class="tile" href="detective/" style="--c:var(--noise-2)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Detective</span>
+          <span class="tile-blurb">Solve a murder by likelihood ratios</span>
+          <span class="tile-concept">Bayesian reasoning · evidence</span>
+        </a>
+        <a class="tile" href="trial/" style="--c:var(--noise-2)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Trial Lawyer</span>
+          <span class="tile-blurb">Update on evidence, set a threshold</span>
+          <span class="tile-concept">Sequential Bayes · threshold</span>
+        </a>
+        <a class="tile" href="stock/" style="--c:var(--gold)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Stock Picker</span>
+          <span class="tile-blurb">Bet your bankroll on noisy signals</span>
+          <span class="tile-concept">Calibration under risk</span>
+        </a>
+        <a class="tile" href="vc/" style="--c:var(--gold)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">VC Portfolio</span>
+          <span class="tile-blurb">Allocate $10M across startups</span>
+          <span class="tile-concept">Power-law payoffs</span>
+        </a>
+        <a class="tile" href="inspector/" style="--c:var(--leaf)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Inspector</span>
+          <span class="tile-blurb">Tune a fraud detector's threshold</span>
+          <span class="tile-concept">Sensitivity vs specificity</span>
+        </a>
+        <a class="tile" href="whistle/" style="--c:var(--noise-2)">
+          <span class="tile-top"></span>
+          <span class="tile-kicker">SIM</span>
+          <span class="tile-title">Whistleblower</span>
+          <span class="tile-blurb">Five rumors, varying independence</span>
+          <span class="tile-concept">Correlated evidence</span>
+        </a></div>
+      </section>
+  </div>
+</div>
+</body>
+</html>

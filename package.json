@@ -1,0 +1,13 @@
+{
+  "name": "noise-judgement-prediction",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Signal & Noise Lab — standalone forecasting exercises hosted on GitHub Pages",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}
