@@ -2,22 +2,30 @@
 
 // ─── Outbreak Tracker ────────────────────────────────────────────────────
 // Multi-day epidemic. Each day shows new case count. User updates P(peak > threshold).
-const OutbreakConfig = {
-  threshold: 1000,         // peak cases threshold
-  startDay: 1,
-  totalDays: 12,
-  truePeakDay: 9,
-  // pre-baked daily new-case curve (a real outbreak with stochastic noise)
-  // crafted so peak happens around day 9 and total active cases peak ~1200
-  trueCurve: [12, 22, 38, 64, 110, 195, 340, 580, 920, 1180, 980, 720, 450],
-  // What a good Bayesian forecaster would believe about P(peak > 1000) given only
-  // the data available up to each day. Early on the growth rate (~1.7×/day) already
-  // implies a likely breach, so belief rises steadily; on day 10 the count hits 1,180,
-  // exceeding the threshold outright → certainty from then on.
-  referenceCurve: [.20, .22, .25, .30, .38, .50, .68, .85, .97, 1, 1, 1, 1],
-};
+// Two hand-authored scenarios — one breaches the threshold, one is contained and
+// fizzles — picked by the run seed, so "it always blows up" is never the lesson.
+const OutbreakScenarios = [
+  {
+    threshold: 1000, truePeakDay: 9,
+    // a real outbreak: sustained ~1.7×/day growth, peak ~1,180 on day 10
+    trueCurve: [12, 22, 38, 64, 110, 195, 340, 580, 920, 1180, 980, 720, 450],
+    // What a good Bayesian should believe about P(peak > 1000) given data so far.
+    // Early growth rate already implies a likely breach; day 10 exceeds it outright.
+    referenceCurve: [.20, .22, .25, .30, .38, .50, .68, .85, .97, 1, 1, 1, 1],
+    lesson: 'Exponential growth fools intuition. From day 1 (12 cases) to day 4 (64), the curve looked manageable — but at ~1.7× per day you were already more than two doublings in, and the growth rate alone implied a likely breach. By the time the peak was visible in the raw counts, the only thing left to update on was the inflection.',
+  },
+  {
+    threshold: 1000, truePeakDay: 8,
+    // a contained outbreak: growth decelerates from ~70%/day to near zero, peak 172
+    trueCurve: [14, 24, 40, 62, 88, 118, 148, 168, 172, 150, 118, 84, 58],
+    // Reference belief rises a little early, then falls as deceleration shows up.
+    referenceCurve: [.20, .22, .25, .28, .28, .24, .18, .11, .05, .02, .01, .01, .01],
+    lesson: 'The growth RATE is the tell, not the case count. Cases rose every single day until day 9 — but day-over-day growth was already slowing from ~70% to ~15% by mid-week, which is exactly what containment looks like. Forecasters who watched the rising counts kept updating up; those who watched the growth rate started updating down days earlier.',
+  },
+];
 
-const StationOutbreak = ({ onComplete, recordScore }) => {
+const StationOutbreak = ({ onComplete, recordScore, seed=1 }) => {
+  const OutbreakConfig = React.useMemo(() => OutbreakScenarios[Math.floor(mulberry32(seed * 47 + 5)() * OutbreakScenarios.length)], [seed]);
   const [day, setDay] = React.useState(0); // index into trueCurve
   const [prob, setProb] = React.useState(30);
   const [phase, setPhase] = React.useState('intro'); // intro | day | reveal | done
@@ -47,7 +55,7 @@ const StationOutbreak = ({ onComplete, recordScore }) => {
 
   if (phase === 'intro') {
     return (
-      <Panel eyebrow="Simulation · Outbreak Tracker" title="Day 1: 12 new cases reported." accent="var(--noise)">
+      <Panel eyebrow="Simulation · Outbreak Tracker" title={`Day 1: ${OutbreakConfig.trueCurve[0]} new cases reported.`} accent="var(--noise)">
         <Callout tone="signal" icon="⚠">
           A novel respiratory illness has appeared in a city of 1.2M people. <br/>
           <strong>Your job:</strong> forecast whether the peak daily case count will exceed <strong>{OutbreakConfig.threshold.toLocaleString()}</strong>. You'll see one day of data at a time and update your probability.
@@ -119,7 +127,7 @@ const StationOutbreak = ({ onComplete, recordScore }) => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginTop:16 }}>
                 <Stat label="Final P(peak >)" value={`${prob}%`} tone="signal"/>
                 <Stat label="Gap vs. reference" value={`${gapPts} pts`} tone={refGap < .12 ? 'good' : refGap < .22 ? 'neutral' : 'bad'} sub="avg |you − reference|"/>
-                <Stat label="Reference (final)" value="100%" sub="peak breached on day 10"/>
+                <Stat label="Reference (final)" value={`${Math.round(OutbreakConfig.referenceCurve[OutbreakConfig.referenceCurve.length-1]*100)}%`} sub={wentAbove ? 'threshold was breached' : 'threshold never breached'}/>
               </div>
 
               <Callout tone={refGap < .12 ? 'good' : refGap < .22 ? 'gold' : 'noise'} icon={refGap < .12 ? '✓' : refGap < .22 ? '◑' : '✗'}>
@@ -130,7 +138,7 @@ const StationOutbreak = ({ onComplete, recordScore }) => {
         })()}
 
         <Callout tone="signal" icon="◑">
-          <strong>The lesson:</strong> exponential growth fools intuition. From day 1 (12 cases) to day 4 (64), the curve looked manageable — but at ~1.7× per day you were already more than two doublings in, and the growth <em>rate</em> alone implied a likely breach. By the time the peak was visible in the raw counts, the only thing left to update on was the inflection.
+          <strong>The lesson:</strong> {OutbreakConfig.lesson}
         </Callout>
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
           <Button size="lg" onClick={onComplete}>Back to lab →</Button>

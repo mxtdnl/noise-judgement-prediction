@@ -185,6 +185,39 @@ const StationTrial = ({ onComplete, recordScore }) => {
         </svg>
       </div>
 
+      {/* the actual Bayes arithmetic, exhibit by exhibit */}
+      <div style={{ padding:'14px 16px', borderRadius:14, background:'var(--bg-soft)', border:'1px solid var(--line)', marginTop:14 }}>
+        <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.14em', marginBottom:8 }}>the Bayes arithmetic, exhibit by exhibit</div>
+        <div className="mono" style={{ display:'grid', gridTemplateColumns:'2.4fr .7fr .9fr .7fr', background:'var(--bg-card)', borderRadius:10, border:'1px solid var(--line)', overflow:'hidden' }}>
+          {(() => {
+            const priorOdds = TrialCase.prior / (1 - TrialCase.prior);
+            const cell = { fontSize:12.5, padding:'6px 10px' };
+            let running = priorOdds;
+            const rows = TrialCase.evidence.map((ev, i) => {
+              running *= ev.lr;
+              return (
+                <React.Fragment key={i}>
+                  <span style={{ ...cell, borderTop:'1px solid var(--line)', color:'var(--ink-2)', fontFamily:'inherit' }}>#{i+1} {ev.text.length > 60 ? ev.text.slice(0, 57) + '…' : ev.text}</span>
+                  <span style={{ ...cell, borderTop:'1px solid var(--line)', fontWeight:600, color: ev.lr >= 1 ? 'var(--bad)' : 'var(--good)' }}>× {ev.lr}</span>
+                  <span style={{ ...cell, borderTop:'1px solid var(--line)' }}>= {running.toFixed(2)}</span>
+                  <span style={{ ...cell, borderTop:'1px solid var(--line)', color:'var(--ink-3)' }}>{Math.round(running/(1+running)*100)}%</span>
+                </React.Fragment>
+              );
+            });
+            return [
+              <span key="h0" style={{ ...cell, color:'var(--ink-3)' }}>start: prior {Math.round(TrialCase.prior*100)}%</span>,
+              <span key="h1" style={{ ...cell }}></span>,
+              <span key="h2" style={{ ...cell, fontWeight:600 }}>odds {priorOdds.toFixed(2)}</span>,
+              <span key="h3" style={{ ...cell, color:'var(--ink-3)' }}>{Math.round(TrialCase.prior*100)}%</span>,
+              ...rows,
+            ];
+          })()}
+        </div>
+        <div style={{ fontSize:12.5, color:'var(--ink-3)', marginTop:8 }}>
+          Each exhibit multiplies the odds of guilt by its likelihood ratio (red = incriminating, green = exculpatory). Converting the final odds back gives the {Math.round(finalOptimal*100)}% you were graded against — no step of it is a judgment call once the LRs are set.
+        </div>
+      </div>
+
       <Callout tone="signal" icon="◆">
         <strong>What this case teaches:</strong> evidence #6 (the search history) was the decisive piece — a likelihood ratio of ~5.5×, hard to explain innocently. Most people undershoot it. The defense's alternative suspect (ev #7) had a smaller mitigating effect than people emotionally felt. Real evidence is multiplicative; emotional weight is not. Even so, the Bayes-optimal posterior lands near {Math.round(finalOptimal*100)}% — below any reasonable conviction threshold. A strong-feeling case can still fall short of "beyond reasonable doubt."
       </Callout>
@@ -340,17 +373,20 @@ const StationVC = ({ onComplete, recordScore }) => {
 
 // ─── Inspector / Threshold ───────────────────────────────────────────────
 // User sets a threshold on a fraud detector. Sliding it changes false positives / negatives.
-const StationInspector = ({ onComplete, recordScore }) => {
+const StationInspector = ({ onComplete, recordScore, seed=1 }) => {
   // Population of 10,000 transactions; 100 are fraud
-  // Each transaction has a "score" sampled from a distribution:
+  // Each transaction has a "score" sampled from a distribution (seeded per run,
+  // with slight variation in how separable fraud is — so the optimum moves):
   // - Legit: Normal(mean=30, sd=12)
-  // - Fraud: Normal(mean=70, sd=15)
+  // - Fraud: Normal(mean≈66-74, sd≈13-17)
   const populations = React.useMemo(() => {
-    const rng = mulberry32(13);
+    const rng = mulberry32(seed * 101 + 13);
+    const fraudMean = 66 + rng() * 8;
+    const fraudSd = 13 + rng() * 4;
     const legit = Array.from({length:9900}).map(() => Math.max(0, Math.min(100, 30 + gauss(rng) * 12)));
-    const fraud = Array.from({length:100}).map(() => Math.max(0, Math.min(100, 70 + gauss(rng) * 15)));
+    const fraud = Array.from({length:100}).map(() => Math.max(0, Math.min(100, fraudMean + gauss(rng) * fraudSd)));
     return { legit, fraud };
-  }, []);
+  }, [seed]);
 
   const [threshold, setThreshold] = React.useState(50);
   const [phase, setPhase] = React.useState('intro'); // intro | tune | done
@@ -441,7 +477,7 @@ const StationInspector = ({ onComplete, recordScore }) => {
         </div>
 
         <Callout tone="signal" icon="◆">
-          <strong>The trade-off:</strong> low threshold catches more fraud but produces many false alarms. High threshold is selective but lets fraud slip through. The "optimal" threshold depends on the relative costs. For these costs (FP=$10, FN=$500), the sweet spot sits around 45–55 — and the curve above is fairly flat across that range, which is why "roughly right" beats "precisely wrong."
+          <strong>The trade-off:</strong> low threshold catches more fraud but produces many false alarms. High threshold is selective but lets fraud slip through. The "optimal" threshold depends on the relative costs — for these costs (FP=$10, FN=$500) it lands near {best.t} this run — and the curve above is fairly flat around the optimum, which is why "roughly right" beats "precisely wrong."
         </Callout>
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
           <Button size="lg" onClick={onComplete}>Back to lab →</Button>
@@ -595,6 +631,42 @@ const StationWhistle = ({ onComplete, recordScore }) => {
             </div>
           ))}
         </div>
+        {/* how the correlation-aware number is actually computed */}
+        <div style={{ padding:'14px 16px', borderRadius:14, background:'var(--bg-soft)', border:'1px solid var(--line)', marginTop:14 }}>
+          <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.14em', marginBottom:8 }}>the arithmetic behind the optimal</div>
+          {(() => {
+            const priorOdds = WhistleCase.prior / (1 - WhistleCase.prior);
+            const independent = WhistleCase.rumors.filter(r => r.isIndependent);
+            const cluster = WhistleCase.rumors.filter(r => !r.isIndependent);
+            const best = cluster.slice().sort((a,b) => b.reliability*b.fits - a.reliability*a.fits)[0];
+            let running = priorOdds;
+            const line = (label, lr, note) => {
+              running *= lr;
+              return (
+                <div key={label} className="mono" style={{ display:'flex', justifyContent:'space-between', gap:10, fontSize:12.5, padding:'5px 0', borderTop:'1px solid var(--line)' }}>
+                  <span style={{ color:'var(--ink-2)', fontFamily:'inherit' }}>{label}{note ? <span style={{ color:'var(--ink-4)' }}> — {note}</span> : null}</span>
+                  <span style={{ whiteSpace:'nowrap' }}>× {lr.toFixed(1)} → {Math.round(running/(1+running)*100)}%</span>
+                </div>
+              );
+            };
+            return (
+              <div>
+                <div className="mono" style={{ display:'flex', justifyContent:'space-between', fontSize:12.5, padding:'5px 0' }}>
+                  <span>prior {Math.round(WhistleCase.prior*100)}%</span><span>odds {priorOdds.toFixed(2)}</span>
+                </div>
+                {independent.map(r => line(`Rumor ${r.id} (independent)`, rumorLR(r)))}
+                {line(`Rumors ${cluster.map(r=>r.id).join('+')} — one correlated cluster`, rumorLR(best), 'counted ONCE, at its strongest member')}
+                <div style={{ fontSize:12.5, color:'var(--ink-3)', marginTop:8 }}>
+                  If you instead multiplied all {WhistleCase.rumors.length} rumors as if independent, the posterior would land near {(() => {
+                    let o = priorOdds; WhistleCase.rumors.forEach(r => { o *= rumorLR(r); });
+                    return Math.round(o/(1+o)*100);
+                  })()}% — that inflation is exactly what "echo chamber" means in numbers.
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
           <Button size="lg" onClick={onComplete}>Back to lab →</Button>
         </div>

@@ -1,21 +1,42 @@
 // stations.jsx — six stations of the Forecasting Lab
 
 // ─── Station 1: Spot the Signal ──────────────────────────────────────────
-const SignalRounds = [
-  { id:'s1', seed: 7,  signal:'none',  noise: 9,  prompt:'Sales over the last 40 days', accept:'noise',  truth:'There is no underlying trend. Every dot is pure noise around a flat mean.', tip:'Even random walks form patterns the brain mistakes for stories.' },
-  { id:'s2', seed: 19, signal:'up',    noise: 11, prompt:'Weekly active users since launch', accept:'signal', truth:'There IS a real upward trend (≈ +30 over the window), buried in noise.', tip:'Slow upward signals are hardest to spot when noise > signal.' },
-  { id:'s3', seed: 31, signal:'step',  noise: 7,  prompt:'Defect rate after a process change', accept:'signal', truth:'A real step change happens at t≈22. The mean shifts up.', tip:'Step changes are easier to test than slope changes — split before/after.' },
-  { id:'s4', seed: 44, signal:'none',  noise: 13, prompt:'Daily app rating (random sample)', accept:'noise',  truth:'No signal. The eye picks out a "dip" and a "recovery" that aren\'t there.', tip:'High noise + small sample = phantom narratives. Demand more data.' },
-  { id:'s5', seed: 58, signal:'cycle', noise: 5,  prompt:'Hourly checkout volume', accept:'signal', truth:'A real cyclical pattern (period ≈ ½ window). Real cycles repeat; noise doesn\'t.', tip:'Real cycles persist out-of-sample. Test the prediction, not the chart.' },
+// Rounds are generated fresh from the run seed: 2 pure-noise series plus 3
+// distinct signal types, in a shuffled order, with fresh data every run.
+const SignalPromptPool = [
+  'Sales over the last 40 days', 'Weekly active users since launch', 'Defect rate after a process change',
+  'Daily app rating (random sample)', 'Hourly checkout volume', 'Support tickets per day',
+  'Sign-ups after a press mention', 'Factory output per shift', 'Daily podcast downloads', 'Checkout conversion rate',
 ];
+const SignalTypeInfo = {
+  none: { accept:'noise',  truth:'There is no underlying trend. Every dot is pure noise around a flat mean.', tip:'Random noise forms patterns the brain mistakes for stories. Demand more data.' },
+  up:   { accept:'signal', truth:'There IS a real upward trend (≈ +30 over the window), buried in noise.', tip:'Slow upward signals are hardest to spot when noise > signal.' },
+  down: { accept:'signal', truth:'There IS a real downward trend (≈ −30 over the window), hidden in the noise.', tip:'Declines hide in noise just like rises. Check the slope, not the story.' },
+  step: { accept:'signal', truth:'A real step change happens just past the middle of the window — the mean shifts up.', tip:'Step changes are easier to test than slope changes — split before/after and compare means.' },
+  cycle:{ accept:'signal', truth:'A real cyclical pattern (period ≈ ½ window). Real cycles repeat; noise doesn\'t.', tip:'Real cycles persist out-of-sample. Test the prediction, not the chart.' },
+};
+const makeSignalRounds = (seed) => {
+  const rng = mulberry32(seed * 7919 + 11);
+  const prompts = seededShuffle(SignalPromptPool, rng);
+  const sigTypes = seededShuffle(['up','down','step','cycle'], rng).slice(0, 3);
+  const types = seededShuffle(['none', 'none', ...sigTypes], rng);
+  return types.map((type, i) => ({
+    id: 's' + (i+1), type,
+    dataSeed: 1 + Math.floor(rng() * 1e6),
+    noise: type === 'cycle' ? 5 + rng() * 3 : 7 + rng() * 6,
+    prompt: prompts[i],
+    ...SignalTypeInfo[type],
+  }));
+};
 
-const StationSignal = ({ onComplete, recordScore, difficulty='regular' }) => {
+const StationSignal = ({ onComplete, recordScore, seed=1, difficulty='regular' }) => {
+  const rounds = React.useMemo(() => makeSignalRounds(seed), [seed]);
   const [round, setRound] = React.useState(0);
   const [phase, setPhase] = React.useState('decide'); // decide | reveal
   const [picks, setPicks] = React.useState([]);
   const noiseMul = difficulty === 'easy' ? 0.7 : difficulty === 'hard' ? 1.4 : 1.0;
-  const cur = SignalRounds[round];
-  const data = React.useMemo(() => genSeries({ seed: cur.seed, n: 40, signal: cur.signal, noise: cur.noise * noiseMul, bias: 50 }), [cur, noiseMul]);
+  const cur = rounds[round];
+  const data = React.useMemo(() => genSeries({ seed: cur.dataSeed, n: 40, signal: cur.type, noise: cur.noise * noiseMul, bias: 50 }), [cur, noiseMul]);
 
   const choose = (choice) => {
     const correct = choice === cur.accept;
@@ -23,9 +44,9 @@ const StationSignal = ({ onComplete, recordScore, difficulty='regular' }) => {
     setPhase('reveal');
   };
   const next = () => {
-    if (round + 1 >= SignalRounds.length) {
+    if (round + 1 >= rounds.length) {
       const correct = picks.filter(p => p.correct).length;
-      recordScore('signal', { correct, total: SignalRounds.length });
+      recordScore('signal', { correct, total: rounds.length });
       onComplete();
       return;
     }
@@ -36,10 +57,10 @@ const StationSignal = ({ onComplete, recordScore, difficulty='regular' }) => {
   const last = picks[picks.length - 1];
 
   return (
-    <Panel eyebrow={`Station 01 · Round ${round+1} of ${SignalRounds.length}`} title="Is this a real trend, or just noise?" accent="var(--signal)">
+    <Panel eyebrow={`Station 01 · Round ${round+1} of ${rounds.length}`} title="Is this a real trend, or just noise?" accent="var(--signal)">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
         <span style={{ color:'var(--ink-2)', fontSize:15 }}>{cur.prompt}</span>
-        <ProgressDots total={SignalRounds.length} current={round}/>
+        <ProgressDots total={rounds.length} current={round}/>
       </div>
 
       <div style={{ background:'var(--bg-soft)', borderRadius:18, padding:'14px 16px 6px', border:'1px solid var(--line)'}}>
@@ -68,7 +89,7 @@ const StationSignal = ({ onComplete, recordScore, difficulty='regular' }) => {
               {picks.filter(p=>p.correct).length} / {picks.length} correct so far
             </span>
             <Button onClick={next} size="lg">
-              {round + 1 >= SignalRounds.length ? 'Finish station →' : 'Next round →'}
+              {round + 1 >= rounds.length ? 'Finish station →' : 'Next round →'}
             </Button>
           </div>
         </div>
@@ -90,6 +111,17 @@ const QuizQs = [
   { q:'Which year was the modern Eiffel Tower completed?', a:'1879', b:'1889', answer:'b', note:'1889, for the World\'s Fair marking the centennial of the French Revolution.' },
   { q:'Which is heavier?', a:'A cubic meter of dry pine wood', b:'A cubic meter of saltwater', answer:'b', note:'Saltwater ≈ 1,025 kg/m³ vs pine ≈ 500 kg/m³. Saltwater is denser than fresh AND most softwoods.' },
   { q:'Which planet has more moons (known, as of recent counts)?', a:'Jupiter', b:'Saturn', answer:'b', note:'Saturn took the lead — 140+ confirmed moons compared to Jupiter\'s 95-ish.' },
+  { q:'Which country has a larger population?', a:'Nigeria', b:'Russia', answer:'a', note:'Nigeria (~220M) comfortably exceeds Russia (~144M) — and the gap is widening fast.' },
+  { q:'Which planet is closer to Earth, averaged over time?', a:'Mercury', b:'Venus', answer:'a', note:'Venus comes closest at its nearest approach, but Mercury spends more time near us — on average, Mercury is the closest planet to Earth (and to every other planet).' },
+  { q:'Which has more bones?', a:'A human hand', b:'A human foot', answer:'a', note:'The hand has 27 bones; the foot has 26. About as close as anatomy gets.' },
+  { q:'Which covers a larger area?', a:'The Pacific Ocean', b:'All land on Earth combined', answer:'a', note:'The Pacific (~165M km²) out-measures every continent and island combined (~149M km²).' },
+  { q:'Which was demonstrated first?', a:'Television', b:'Sliced bread (machine-sliced, sold commercially)', answer:'a', note:'Television was demonstrated in 1926; commercially sliced bread arrived in 1928. So TV is literally the greatest thing since… before sliced bread.' },
+  { q:'Which country drinks more tea per person?', a:'Turkey', b:'The United Kingdom', answer:'a', note:'Turkey leads the world at roughly 3+ kg per person per year — about twice the UK figure.' },
+  { q:'Which is farther north?', a:'London, UK', b:'Calgary, Canada', answer:'a', note:'London sits at ~51.5°N, Calgary at ~51.0°N. Canada feels colder, but the Gulf Stream, not latitude, is why.' },
+  { q:'Which country spans more time zones (including territories)?', a:'Russia', b:'France', answer:'b', note:'France covers 12 time zones thanks to its overseas territories; Russia has 11.' },
+  { q:'Which animal kills more humans per year?', a:'Sharks', b:'Hippos', answer:'b', note:'Hippos kill roughly 500 people per year; sharks kill about 10. Fear is a terrible base-rate estimator.' },
+  { q:'Which is older?', a:'Harvard University', b:'Calculus', answer:'a', note:'Harvard was founded in 1636; Newton and Leibniz developed calculus decades later (1660s–1680s).' },
+  { q:'Which has a larger population?', a:'The Tokyo metropolitan area', b:'Australia', answer:'a', note:'Greater Tokyo (~37M) exceeds all of Australia (~26M).' },
 ];
 
 // This is a 2-alternative forced choice: you always pick the option you think
@@ -104,13 +136,15 @@ const bucketize = (entries) => {
   });
 };
 
-const StationCalibration = ({ onComplete, recordScore }) => {
+const StationCalibration = ({ onComplete, recordScore, seed=1 }) => {
+  // draw 10 of the 20-question bank per run, seeded — replays get fresh questions
+  const qs = React.useMemo(() => seededShuffle(QuizQs, mulberry32(seed * 104729 + 3)).slice(0, 10), [seed]);
   const [idx, setIdx] = React.useState(0);
   const [pick, setPick] = React.useState(null);
   const [conf, setConf] = React.useState(50);
   const [phase, setPhase] = React.useState('answer'); // answer | confidence | reveal | done
   const [log, setLog] = React.useState([]);
-  const cur = QuizQs[idx];
+  const cur = qs[idx];
 
   const submit = () => {
     const correct = pick === cur.answer;
@@ -120,12 +154,12 @@ const StationCalibration = ({ onComplete, recordScore }) => {
   };
 
   const next = () => {
-    if (idx + 1 >= QuizQs.length) {
+    if (idx + 1 >= qs.length) {
       // submit() already appended the final entry to `log`; don't append it again.
       const allEntries = log;
       const buckets = bucketize(allEntries);
       const correctCount = allEntries.filter(e => e.correct).length;
-      recordScore('calibration', { buckets, correct: correctCount, total: QuizQs.length, log: allEntries });
+      recordScore('calibration', { buckets, correct: correctCount, total: qs.length, log: allEntries });
       setPhase('done');
       return;
     }
@@ -161,8 +195,8 @@ const StationCalibration = ({ onComplete, recordScore }) => {
   }
 
   return (
-    <Panel eyebrow={`Station 02 · Question ${idx+1}/${QuizQs.length}`} title={cur.q} accent="var(--signal)">
-      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:14 }}><ProgressDots total={QuizQs.length} current={idx}/></div>
+    <Panel eyebrow={`Station 02 · Question ${idx+1}/${qs.length}`} title={cur.q} accent="var(--signal)">
+      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:14 }}><ProgressDots total={qs.length} current={idx}/></div>
 
       {phase === 'answer' && (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -229,7 +263,7 @@ const StationCalibration = ({ onComplete, recordScore }) => {
               <div style={{ marginTop:6 }}>{cur.note}</div>
             </Callout>
             <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
-              <Button onClick={next} size="lg">{idx+1>=QuizQs.length ? 'See your calibration →' : 'Next question →'}</Button>
+              <Button onClick={next} size="lg">{idx+1>=qs.length ? 'See your calibration →' : 'Next question →'}</Button>
             </div>
           </div>
         );
@@ -300,6 +334,45 @@ const BrierEvents = [
     ],
     lesson:'<6 hours is roughly 14–18% of adults. Confusing it with the more familiar <7 stat (~33%) is the trap.'
   },
+  {
+    id:'b7', q:'A randomly chosen US domestic flight arrives more than 15 minutes late.',
+    truth:false, optimal:.21,
+    context:[
+      { kind:'reference', text:'DOT statistics: roughly 78–80% of US domestic flights arrive within 15 minutes of schedule in a normal year.' },
+      { kind:'data', text:'This flight is a random draw — no weather event or holiday-season skew applies.' },
+      { kind:'note', text:'Delays feel more common than they are because the bad ones are memorable.' },
+    ],
+    lesson:'The right forecast is about 20%. Availability bias — vividly remembering the one 3-hour delay — pushes most people far higher.'
+  },
+  {
+    id:'b8', q:'A randomly selected new restaurant is still open 5 years after launch.',
+    truth:true, optimal:.50,
+    context:[
+      { kind:'reference', text:'Across all new US businesses, government data shows roughly half survive to the 5-year mark. Restaurants track this figure fairly closely.' },
+      { kind:'note', text:'The famous "90% of restaurants fail in the first year" statistic is a myth — no serious dataset supports it.' },
+      { kind:'analogy', text:'First-year closure rates for restaurants run ~15–20%, similar to other service businesses.' },
+    ],
+    lesson:'About 50% survive 5 years. The "90% fail" folklore is a case study in how a made-up number becomes a base rate in people\'s heads.'
+  },
+  {
+    id:'b9', q:'A randomly chosen active NBA player is 7 feet (213 cm) or taller.',
+    truth:false, optimal:.07,
+    context:[
+      { kind:'reference', text:'NBA rosters hold ~450 players; recent seasons list roughly 25–35 players at 7 feet or taller.' },
+      { kind:'analogy', text:'The average NBA player is ~6\'6" — extremely tall, but a full 6 inches below 7 feet.' },
+      { kind:'note', text:'Famous centers are heavily over-represented in highlights and memory.' },
+    ],
+    lesson:'Only ~6–8% of NBA players are 7-footers. The stars you can name are a biased sample of the league.'
+  },
+  {
+    id:'b10', q:'The next child born (worldwide, at random) is a boy.',
+    truth:true, optimal:.51,
+    context:[
+      { kind:'physical', text:'The human sex ratio at birth is remarkably stable at about 105 boys per 100 girls.' },
+      { kind:'note', text:'No other information about the family is available.' },
+    ],
+    lesson:'The answer is ~51%, not 50%. When you genuinely know a small edge, a calibrated forecaster states it — 51% and 50% are different claims.'
+  },
 ];
 
 const ContextCard = ({ kind, text }) => {
@@ -329,12 +402,14 @@ const ContextCard = ({ kind, text }) => {
   );
 };
 
-const StationBrier = ({ onComplete, recordScore }) => {
+const StationBrier = ({ onComplete, recordScore, seed=1 }) => {
+  // draw 6 of the 10-event bank per run, seeded
+  const events = React.useMemo(() => seededShuffle(BrierEvents, mulberry32(seed * 48611 + 7)).slice(0, 6), [seed]);
   const [idx, setIdx] = React.useState(0);
   const [prob, setProb] = React.useState(50);
-  const [phase, setPhase] = React.useState('predict'); // predict | reveal
+  const [phase, setPhase] = React.useState('predict'); // predict | reveal | done
   const [rounds, setRounds] = React.useState([]);
-  const cur = BrierEvents[idx];
+  const cur = events[idx];
 
   const submit = () => {
     const p = prob / 100;
@@ -345,10 +420,10 @@ const StationBrier = ({ onComplete, recordScore }) => {
     setPhase('reveal');
   };
   const next = () => {
-    if (idx + 1 >= BrierEvents.length) {
+    if (idx + 1 >= events.length) {
       const avg = rounds.reduce((s,r)=>s+r.score,0) / rounds.length;
       recordScore('brier', { avg, rounds });
-      onComplete();
+      setPhase('done');
       return;
     }
     setIdx(idx+1);
@@ -358,10 +433,47 @@ const StationBrier = ({ onComplete, recordScore }) => {
 
   const avgSoFar = rounds.length ? rounds.reduce((s,r)=>s+r.score,0) / rounds.length : null;
 
+  if (phase === 'done') {
+    const avg = rounds.reduce((s,r)=>s+r.score,0) / rounds.length;
+    const optAvg = rounds.reduce((s,r)=>s+r.optimal,0) / rounds.length;
+    const gapAvg = rounds.reduce((s,r)=>s+Math.abs(r.p - r.optimal),0) / rounds.length;
+    return (
+      <Panel eyebrow="Station 03 · Season over" title="Your forecasting season, scored." accent="var(--signal)">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14, marginBottom:16 }}>
+          <Stat label="Your avg Brier" value={avg.toFixed(3)} tone={avg < 0.15 ? 'good' : avg < 0.28 ? 'neutral' : 'bad'} sub="lower is better"/>
+          <Stat label="Optimal avg Brier" value={optAvg.toFixed(3)} tone="signal" sub="the best inference from the clues"/>
+          <Stat label="Avg gap to optimal" value={`${Math.round(gapAvg*100)} pts`} tone={gapAvg < .10 ? 'good' : gapAvg < .20 ? 'neutral' : 'bad'} sub="avg |your prob − optimal prob|"/>
+        </div>
+        <div style={{ background:'var(--bg-card)', border:'1px solid var(--line)', borderRadius:14, overflow:'hidden', marginBottom:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'2.2fr .7fr .7fr .7fr .8fr', padding:'10px 14px', background:'var(--bg-soft)', borderBottom:'1px solid var(--line)' }} className="mono">
+            {['event','you','optimal','outcome','brier'].map(hd => (
+              <span key={hd} style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.14em' }}>{hd}</span>
+            ))}
+          </div>
+          {rounds.map((r, i) => (
+            <div key={i} style={{ display:'grid', gridTemplateColumns:'2.2fr .7fr .7fr .7fr .8fr', padding:'10px 14px', borderBottom: i < rounds.length-1 ? '1px solid var(--line)' : 'none', alignItems:'center' }}>
+              <span style={{ fontSize:13, color:'var(--ink-2)', paddingRight:10 }}>{r.q}</span>
+              <span className="mono" style={{ fontSize:13, fontWeight:600 }}>{Math.round(r.p*100)}%</span>
+              <span className="mono" style={{ fontSize:13, color:'var(--ink-3)' }}>{Math.round(BrierEvents.find(e=>e.id===r.id).optimal*100)}%</span>
+              <span className="mono" style={{ fontSize:13, color: r.outcome ? 'var(--good)' : 'var(--bad)' }}>{r.outcome ? 'Yes' : 'No'}</span>
+              <span className="mono" style={{ fontSize:13, fontWeight:600, color: r.score < 0.15 ? 'var(--good)' : r.score < 0.3 ? 'var(--gold)' : 'var(--bad)' }}>{r.score.toFixed(3)}</span>
+            </div>
+          ))}
+        </div>
+        <Callout tone="signal" icon="∑">
+          <strong>Where does a Brier score come from?</strong> Two skills, added together: <em>calibration</em> (when you say 70%, it happens ~70% of the time) and <em>resolution</em> (daring to move away from the base rate when the clues justify it). Hedging everything at 50% is perfectly calibrated but has zero resolution — over this season a permanent 50% would have scored 0.250. Beat that, and your clue-reading added real information.
+        </Callout>
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
+          <Button onClick={onComplete} size="lg">Finish station →</Button>
+        </div>
+      </Panel>
+    );
+  }
+
   return (
-    <Panel eyebrow={`Station 03 · Event ${idx+1}/${BrierEvents.length}`} title="Will it happen?" accent="var(--signal)">
+    <Panel eyebrow={`Station 03 · Event ${idx+1}/${events.length}`} title="Will it happen?" accent="var(--signal)">
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:14 }}>
-        <ProgressDots total={BrierEvents.length} current={idx}/>
+        <ProgressDots total={events.length} current={idx}/>
         {avgSoFar != null && <span className="mono" style={{ fontSize:12, color:'var(--ink-3)'}}>avg. Brier so far: <strong style={{ color:'var(--ink)'}}>{avgSoFar.toFixed(3)}</strong></span>}
       </div>
 
@@ -423,7 +535,7 @@ const StationBrier = ({ onComplete, recordScore }) => {
             </div>
 
             <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
-              <Button onClick={next} size="lg">{idx+1>=BrierEvents.length ? 'Finish station →' : 'Next event →'}</Button>
+              <Button onClick={next} size="lg">{idx+1>=events.length ? 'See season results →' : 'Next event →'}</Button>
             </div>
           </div>
         );
@@ -444,8 +556,10 @@ const StationBaseRate = ({ onComplete, recordScore }) => {
   const ppv = truePos / (truePos + falsePos); // ~16.7%
 
   const [guess, setGuess] = React.useState(75);
-  const [phase, setPhase] = React.useState('guess'); // guess | step1 | step2 | step3 | done
+  const [phase, setPhase] = React.useState('guess'); // guess | step1 | step2 | step3 | explore
   const [revealed, setRevealed] = React.useState(false);
+  // live-explorer parameters (percentages)
+  const [exp, setExp] = React.useState({ prev: 1, sens: 99, spec: 95 });
 
   const submit = () => { setPhase('step1'); setTimeout(()=>setRevealed(true), 60); };
 
@@ -476,6 +590,70 @@ const StationBaseRate = ({ onComplete, recordScore }) => {
     if (c === 'fp') return 'fp';
     return 'neg';
   };
+
+  // ── live explorer math (dots are a 2,500-person sample of the same rates) ──
+  const expSick = 10000 * exp.prev / 100;
+  const expTP = expSick * exp.sens / 100;
+  const expFP = (10000 - expSick) * (100 - exp.spec) / 100;
+  const expPPV = expTP + expFP > 0 ? expTP / (expTP + expFP) : 0;
+  const dotsTotal = 2500;
+  const dSick = Math.round(dotsTotal * exp.prev / 100);
+  const dTP = Math.round(dSick * exp.sens / 100);
+  const dFP = Math.round((dotsTotal - dSick) * (100 - exp.spec) / 100);
+  const classifyExplore = (i) => {
+    if (i < dSick) return i < dTP ? { type:'tp', color:'var(--noise)' } : { type:'fn', color:'var(--ink-3)' };
+    const j = i - dSick;
+    return j < dFP ? { type:'fp', color:'var(--gold)' } : { type:'tn', color:'var(--bg-soft)' };
+  };
+
+  const finish = () => { recordScore('baseRate', { guess, truth: Math.round(ppv*100) }); onComplete(); };
+
+  if (phase === 'explore') {
+    const ExpSlider = ({ label, value, min, max, step, onChange, hint }) => (
+      <div style={{ padding:'12px 16px', borderRadius:12, background:'var(--bg-card)', border:'1px solid var(--line)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+          <span className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.12em' }}>{label}</span>
+          <span className="mono" style={{ fontSize:20, fontWeight:600 }}>{value}%</span>
+        </div>
+        <input type="range" min={min} max={max} step={step} value={value} onChange={(e)=>onChange(+e.target.value)}/>
+        {hint && <div style={{ fontSize:12, color:'var(--ink-3)', marginTop:-2 }}>{hint}</div>}
+      </div>
+    );
+    return (
+      <Panel eyebrow="Station 04 · Explore" title="Now break it: move the dials yourself." accent="var(--signal)">
+        <p style={{ color:'var(--ink-2)', marginTop:0 }}>The answer you just saw isn't a fixed fact — it's a tug-of-war between the base rate and the test's error rates. Drag the sliders and watch when a positive test is worth believing.</p>
+        <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:24, alignItems:'flex-start' }}>
+          <div style={{ background:'var(--bg-soft)', borderRadius:18, padding:14, border:'1px solid var(--line)'}}>
+            <DotField rows={50} cols={50} dotSize={8} gap={1} classify={classifyExplore}/>
+            <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textAlign:'center', marginTop:8 }}>
+              <span style={{color:'var(--noise-2)'}}>● true positive</span> · <span style={{color:'var(--gold)'}}>● false positive</span> · <span style={{color:'var(--ink-3)'}}>● sick but missed</span>
+            </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <ExpSlider label="prevalence (base rate)" value={exp.prev} min={0.2} max={20} step={0.2}
+              onChange={(v)=>setExp({ ...exp, prev:v })} hint="How common the disease is in the population."/>
+            <ExpSlider label="sensitivity (catches true cases)" value={exp.sens} min={50} max={100} step={1}
+              onChange={(v)=>setExp({ ...exp, sens:v })}/>
+            <ExpSlider label="specificity (clears healthy people)" value={exp.spec} min={80} max={99.8} step={0.2}
+              onChange={(v)=>setExp({ ...exp, spec:v })} hint="False-positive rate = 100% − specificity."/>
+            <div style={{ padding:'16px 20px', borderRadius:14, background:'var(--bg-card)', border:'1.5px solid var(--ink)' }}>
+              <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.12em' }}>P(sick | positive test)</div>
+              <div className="mono" style={{ fontSize:40, fontWeight:600 }}>{Math.round(expPPV*100)}%</div>
+              <div className="mono" style={{ fontSize:12, color:'var(--ink-3)', marginTop:4 }}>
+                = {Math.round(expTP).toLocaleString()} true positives ÷ ({Math.round(expTP).toLocaleString()} + {Math.round(expFP).toLocaleString()} false positives), per 10,000 people
+              </div>
+            </div>
+            <Callout tone="signal" icon="∴">
+              Notice the lever that matters: with a rare disease, <strong>specificity dominates</strong>. Nudging specificity from 95% to 99% does more for a positive test's meaning than any improvement in sensitivity — because almost everyone tested is healthy.
+            </Callout>
+          </div>
+        </div>
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
+          <Button size="lg" onClick={finish}>Finish station →</Button>
+        </div>
+      </Panel>
+    );
+  }
 
   return (
     <Panel eyebrow="Station 04" title="A 99%-accurate test came back positive." accent="var(--signal)">
@@ -534,7 +712,8 @@ const StationBaseRate = ({ onComplete, recordScore }) => {
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                 {phase === 'step1' && <Button onClick={()=>setPhase('step2')}>Show test results →</Button>}
                 {phase === 'step2' && <Button onClick={()=>setPhase('step3')}>Compute the answer →</Button>}
-                {phase === 'step3' && <Button size="lg" onClick={() => { recordScore('baseRate', { guess, truth: Math.round(ppv*100) }); onComplete(); }}>Finish station →</Button>}
+                {phase === 'step3' && <Button variant="ghost" onClick={finish}>Finish station</Button>}
+                {phase === 'step3' && <Button size="lg" onClick={()=>setPhase('explore')}>Experiment with the numbers →</Button>}
               </div>
             </div>
           </div>
@@ -580,8 +759,10 @@ const BayesScenarios = [
   },
 ];
 
-const StationBayes = ({ onComplete, recordScore, scenarioIdx=0 }) => {
-  const scenario = BayesScenarios[scenarioIdx];
+const StationBayes = ({ onComplete, recordScore, seed=1, scenarioIdx }) => {
+  // scenario rotates with the run seed (replays alternate scenarios) unless pinned via prop
+  const sIdx = scenarioIdx != null ? scenarioIdx : Math.floor(mulberry32(seed * 31 + 7)() * BayesScenarios.length);
+  const scenario = BayesScenarios[sIdx];
   const allIds = scenario.evidence.map(e => e.id);
   const [applied, setApplied] = React.useState([]);
   const [phase, setPhase] = React.useState('explore'); // explore | assess | reveal
@@ -747,6 +928,39 @@ const StationBayes = ({ onComplete, recordScore, scenarioIdx=0 }) => {
                     ? 'You over-shot. Piling positive clues together feels convincing, but a modest prior and a couple of negatives pull the posterior back down harder than intuition expects.'
                     : 'You under-shot. Strong positive likelihood ratios compound faster than addition — a chain of good signals moves belief further than it feels like it should.')}
           </Callout>
+
+          {/* the actual arithmetic, step by step */}
+          {(() => {
+            const priorOdds = scenario.prior / (1 - scenario.prior);
+            let running = priorOdds;
+            const rows = scenario.evidence.map(ev => {
+              running *= ev.lr;
+              return { label: ev.label, lr: ev.lr, odds: running, p: running / (1 + running) };
+            });
+            const cell = { fontSize:12.5, padding:'6px 10px' };
+            return (
+              <div style={{ marginTop:14, padding:'14px 16px', borderRadius:14, background:'var(--bg-soft)', border:'1px solid var(--line)' }}>
+                <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.12em', marginBottom:8 }}>the arithmetic, line by line</div>
+                <div className="mono" style={{ display:'grid', gridTemplateColumns:'2fr .8fr .9fr .8fr', background:'var(--bg-card)', borderRadius:10, border:'1px solid var(--line)', overflow:'hidden' }}>
+                  <span style={{ ...cell, color:'var(--ink-3)' }}>start: prior {Math.round(scenario.prior*100)}%</span>
+                  <span style={{ ...cell }}></span>
+                  <span style={{ ...cell, fontWeight:600 }}>odds {priorOdds.toFixed(2)}</span>
+                  <span style={{ ...cell, color:'var(--ink-3)' }}>{Math.round(scenario.prior*100)}%</span>
+                  {rows.map((r, i) => (
+                    <React.Fragment key={i}>
+                      <span style={{ ...cell, borderTop:'1px solid var(--line)', color:'var(--ink-2)', fontFamily:'inherit' }}>{r.label}</span>
+                      <span style={{ ...cell, borderTop:'1px solid var(--line)', color: r.lr >= 1 ? 'var(--good)' : 'var(--bad)', fontWeight:600 }}>× {r.lr.toFixed(1)}</span>
+                      <span style={{ ...cell, borderTop:'1px solid var(--line)' }}>= {r.odds.toFixed(2)}</span>
+                      <span style={{ ...cell, borderTop:'1px solid var(--line)', color:'var(--ink-3)' }}>{Math.round(r.p*100)}%</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+                <div style={{ fontSize:12.5, color:'var(--ink-3)', marginTop:8 }}>
+                  Odds = p ÷ (1−p). Each clue multiplies the odds by its likelihood ratio; converting back at the end gives p = odds ÷ (1+odds) = <strong style={{ color:'var(--ink)' }}>{Math.round(posterior*100)}%</strong>. That's the whole machine.
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
             <Button onClick={onComplete} size="lg">Finish station →</Button>
           </div>
@@ -771,15 +985,24 @@ const generateCrowd = (truth, n=400, seed=42, biasFactor=0.85, spread=0.35) => {
   return guesses;
 };
 
-const StationCrowd = ({ onComplete, recordScore }) => {
-  const TRUTH = 1247; // jelly beans in jar
-  const CROWD_SEED = 91;
+const StationCrowd = ({ onComplete, recordScore, seed=1 }) => {
+  // jar count + crowd are seeded per run, so replays get a fresh jar
+  const cfg = React.useMemo(() => {
+    const rng = mulberry32(seed * 613 + 29);
+    return {
+      TRUTH: 900 + Math.round(rng() * 800),
+      CROWD_SEED: 1000 + Math.floor(rng() * 9000),
+      bias: 0.78 + rng() * 0.08,   // crowds systematically lowball dense jars
+      spread: 0.28 + rng() * 0.08,
+    };
+  }, [seed]);
+  const TRUTH = cfg.TRUTH;
   const [low, setLow] = React.useState(800);
   const [mid, setMid] = React.useState(1000);
   const [high, setHigh] = React.useState(1500);
   const [phase, setPhase] = React.useState('guess');
 
-  const crowd = React.useMemo(() => generateCrowd(TRUTH, 600, CROWD_SEED, 0.82, 0.32), []);
+  const crowd = React.useMemo(() => generateCrowd(TRUTH, 600, cfg.CROWD_SEED, cfg.bias, cfg.spread), [cfg]);
   const median = React.useMemo(() => {
     const s = [...crowd].sort((a,b)=>a-b);
     return s[Math.floor(s.length/2)];

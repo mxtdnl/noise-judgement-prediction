@@ -12,11 +12,12 @@ const ElectionPrecincts = [
   { id:8, name:'Bellwether HS', size:1200,lean:'mixed', skew: 0.00, color:'var(--gold)' },
 ];
 
-const StationElection = ({ onComplete, recordScore }) => {
-  const TRUE_DSHARE = 0.514;
-  // Pre-compute results deterministically
+const StationElection = ({ onComplete, recordScore, seed=1 }) => {
+  // The true D share is drawn per run around the 52% poll (with realistic poll
+  // error), so D usually wins but sometimes doesn't — the night is never a rerun.
   const results = React.useMemo(() => {
-    const rng = mulberry32(33);
+    const rng = mulberry32(seed * 97 + 41);
+    const TRUE_DSHARE = Math.max(0.46, Math.min(0.58, 0.52 + gauss(rng) * 0.025));
     return ElectionPrecincts.map(p => {
       const trueShareHere = TRUE_DSHARE + p.skew;
       const noiseSd = 0.20 / Math.sqrt(p.size);
@@ -24,7 +25,7 @@ const StationElection = ({ onComplete, recordScore }) => {
       const dVotes = Math.round(dShareNoisy * p.size);
       return { ...p, dVotes, rVotes: p.size - dVotes, share: dShareNoisy };
     });
-  }, []);
+  }, [seed]);
 
   // Reference forecaster: at each checkpoint (k precincts reported), estimate
   // P(D wins) by Monte Carlo over the UNREPORTED precincts. The reference knows
@@ -35,7 +36,7 @@ const StationElection = ({ onComplete, recordScore }) => {
   const referenceCurve = React.useMemo(() => {
     const POLL = 0.52, POLL_SD = 0.03, SIMS = 500;
     return Array.from({ length: results.length + 1 }, (_, k) => {
-      const rng = mulberry32(2000 + k);
+      const rng = mulberry32(seed * 1009 + 2000 + k);
       const reportedD = results.slice(0, k).reduce((s,r)=>s+r.dVotes, 0);
       const reportedR = results.slice(0, k).reduce((s,r)=>s+r.rVotes, 0);
       const unreported = results.slice(k);
@@ -612,7 +613,7 @@ const StockPool = [
   ]},
 ];
 
-const StationStock = ({ onComplete, recordScore }) => {
+const StationStock = ({ onComplete, recordScore, seed=1 }) => {
   const [idx, setIdx] = React.useState(0);
   const [bankroll, setBankroll] = React.useState(1000);
   const [prob, setProb] = React.useState(50);
@@ -624,8 +625,8 @@ const StationStock = ({ onComplete, recordScore }) => {
 
   const place = () => {
     const wager = Math.round(bankroll * (stake / 100));
-    // outcome
-    const rng = mulberry32(idx * 999 + Math.floor(cur.truth * 1000));
+    // outcome (seeded per run, so replays resolve differently)
+    const rng = mulberry32(seed * 733 + idx * 999 + Math.floor(cur.truth * 1000));
     const up = rng() < cur.truth;
     // generate a realistic price movement (% change)
     // up moves: 1–12%, down moves: -1 to -10%, magnitude varies

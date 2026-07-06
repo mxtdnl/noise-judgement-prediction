@@ -7,6 +7,15 @@ const mulberry32 = (a) => () => {
   t ^= t + Math.imul(t ^ t >>> 7, t | 61);
   return ((t ^ t >>> 14) >>> 0) / 4294967296;
 };
+// Fisher–Yates shuffle driven by a seeded rng (returns a copy)
+const seededShuffle = (arr, rng) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 const gauss = (rng) => {
   let u = 0, v = 0;
   while (u === 0) u = rng();
@@ -238,4 +247,4 @@ const BeliefBar = ({ prior, posterior, label='belief' }) => (
   </div>
 );
 
-Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries });
+Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries, seededShuffle });

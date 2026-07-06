@@ -12,6 +12,10 @@ const AnchorQuestions = [
   { id:6, q:'What was the original price of an iPod (in USD, 2001)?',        truth:399,  unit:'USD' },
   { id:7, q:'How many bones are in the adult human body?',                   truth:206,  unit:'bones' },
   { id:8, q:'How long is the Great Wall of China (in km)?',                  truth:21196,unit:'km' },
+  { id:9, q:'How many keys are on a standard piano?',                        truth:88,   unit:'keys' },
+  { id:10,q:'What is the average depth of the ocean (in meters)?',           truth:3688, unit:'m' },
+  { id:11,q:'How many steps lead to the top of the Eiffel Tower?',           truth:1665, unit:'steps' },
+  { id:12,q:'What is the wingspan of a Boeing 747 (in meters)?',             truth:69,   unit:'m' },
 ];
 
 // Generate an "anchor" that's deliberately way too high or way too low (random per session)
@@ -29,27 +33,25 @@ const generateAnchor = (truth, seed, biasHigh) => {
 const logDev = (h) => Math.log10(Math.max(1, h.guess) / h.truth);
 const meanOf = (arr) => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
 
-const StationAnchor = ({ onComplete, recordScore }) => {
+const StationAnchor = ({ onComplete, recordScore, seed=1 }) => {
   const [idx, setIdx] = React.useState(0);
   const [phase, setPhase] = React.useState('intro'); // intro | spin | spinning | guess | reveal | done
   const [anchor, setAnchor] = React.useState(null);
   const [guess, setGuess] = React.useState('');
   const [history, setHistory] = React.useState([]);
+  // Draw 8 of the 12-question bank per run, seeded — replays get fresh questions.
+  const questions = React.useMemo(() => seededShuffle(AnchorQuestions, mulberry32(seed * 337 + 19)).slice(0, 8), [seed]);
   // Balanced design: exactly 4 high anchors and 4 low, shuffled once per session.
   // (Coin flips could hand you 7 highs and 1 low, wrecking the comparison.)
-  const [assignment] = React.useState(() => {
-    const arr = [true,true,true,true,false,false,false,false];
-    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]] = [arr[j],arr[i]]; }
-    return arr;
-  });
+  const assignment = React.useMemo(() => seededShuffle([true,true,true,true,false,false,false,false], mulberry32(seed * 911 + 5)), [seed]);
 
-  const cur = AnchorQuestions[idx];
+  const cur = questions[idx];
   const biasHigh = assignment[idx];
 
   const startSpin = () => {
     setPhase('spinning');
     setTimeout(() => {
-      const a = generateAnchor(cur.truth, idx * 47 + (biasHigh?1:0), biasHigh);
+      const a = generateAnchor(cur.truth, seed * 89 + idx * 47 + (biasHigh?1:0), biasHigh);
       setAnchor(a);
       setPhase('guess');
     }, 1200);
@@ -71,7 +73,7 @@ const StationAnchor = ({ onComplete, recordScore }) => {
   };
 
   const next = () => {
-    if (idx + 1 >= AnchorQuestions.length) {
+    if (idx + 1 >= questions.length) {
       const { effect, dHigh, dLow } = computeEffect(history);
       recordScore('anchor', { effect, dHigh, dLow, history });
       setPhase('done');
@@ -166,7 +168,7 @@ const StationAnchor = ({ onComplete, recordScore }) => {
   if (phase === 'spin' || phase === 'spinning') {
     const spinning = phase === 'spinning';
     return (
-      <Panel eyebrow={`Simulation · Anchoring Lab · ${idx+1}/${AnchorQuestions.length}`} title="Spin the wheel." accent="var(--gold)">
+      <Panel eyebrow={`Simulation · Anchoring Lab · ${idx+1}/${questions.length}`} title="Spin the wheel." accent="var(--gold)">
         <div style={{ textAlign:'center', padding:'32px 0' }}>
           <svg viewBox="0 0 240 240" width="240" style={{ display:'block', margin:'0 auto' }}>
             <circle cx="120" cy="120" r="100" fill="var(--bg-card)" stroke="var(--ink)" strokeWidth="3" style={{ transformOrigin:'120px 120px', animation: spinning ? 'spinFast .9s ease-out' : 'none' }}/>
@@ -192,7 +194,7 @@ const StationAnchor = ({ onComplete, recordScore }) => {
 
   if (phase === 'guess') {
     return (
-      <Panel eyebrow={`Simulation · Anchoring Lab · ${idx+1}/${AnchorQuestions.length}`} title="Your turn." accent="var(--gold)">
+      <Panel eyebrow={`Simulation · Anchoring Lab · ${idx+1}/${questions.length}`} title="Your turn." accent="var(--gold)">
         <div style={{ padding:'22px 24px', borderRadius:16, background:'var(--gold-soft)', border:'1px solid var(--gold)', marginBottom:18 }}>
           <div className="mono" style={{ fontSize:11, color:'var(--gold)', textTransform:'uppercase', letterSpacing:'.14em' }}>your spun number</div>
           <div className="serif" style={{ fontSize:48, fontWeight:600, color:'var(--ink)', lineHeight:1 }}>{anchor.toLocaleString()}</div>
@@ -217,7 +219,7 @@ const StationAnchor = ({ onComplete, recordScore }) => {
   // reveal
   const last = history[history.length - 1];
   return (
-    <Panel eyebrow={`Simulation · Anchoring Lab · ${idx+1}/${AnchorQuestions.length}`} title="The truth." accent="var(--gold)">
+    <Panel eyebrow={`Simulation · Anchoring Lab · ${idx+1}/${questions.length}`} title="The truth." accent="var(--gold)">
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14, marginBottom:16 }}>
         <div style={{ padding:'18px 20px', borderRadius:14, background:'var(--gold-soft)', border:'1px solid var(--gold)' }}>
           <div className="mono" style={{ fontSize:11, color:'var(--gold)', textTransform:'uppercase', letterSpacing:'.14em' }}>anchor (irrelevant)</div>
@@ -233,7 +235,7 @@ const StationAnchor = ({ onComplete, recordScore }) => {
         </div>
       </div>
       <div style={{ display:'flex', justifyContent:'flex-end', marginTop:6 }}>
-        <Button size="lg" onClick={next}>{idx+1 >= AnchorQuestions.length ? 'See your anchor profile →' : 'Next spin →'}</Button>
+        <Button size="lg" onClick={next}>{idx+1 >= questions.length ? 'See your anchor profile →' : 'Next spin →'}</Button>
       </div>
     </Panel>
   );
@@ -241,13 +243,29 @@ const StationAnchor = ({ onComplete, recordScore }) => {
 
 // ─── Drift Detector ──────────────────────────────────────────────────────
 // Time series with optional change point. Click to mark where you think the shift happened.
-const DriftRounds = [
-  { id:1, seed:11, n:50, shift:24, magnitude:14, name:'Daily app sign-ups', context:'After a marketing campaign rolled out, did sign-ups truly shift, or are we seeing noise?' },
-  { id:2, seed:23, n:50, shift:null, name:'Server response times (ms)', context:'A new release went out. Did latency shift?' },
-  { id:3, seed:47, n:50, shift:31, magnitude:-9, name:'Daily revenue ($k)', context:'Tax changes mid-period. Real change or noise?' },
-  { id:4, seed:71, n:50, shift:null, name:'Weekly clicks-per-impression', context:'Marketing claims a 0.3% lift. Look at the data.' },
-  { id:5, seed:99, n:50, shift:15, magnitude:18, name:'Patient recovery rate', context:'A new protocol started early in the window. Did outcomes shift?' },
+// Rounds are generated fresh per run: 3 real shifts (random time + magnitude) and 2 no-shift decoys.
+const DriftContextPool = [
+  { name:'Daily app sign-ups', context:'After a marketing campaign rolled out, did sign-ups truly shift, or are we seeing noise?' },
+  { name:'Server response times (ms)', context:'A new release went out. Did latency shift?' },
+  { name:'Daily revenue ($k)', context:'Tax changes mid-period. Real change or noise?' },
+  { name:'Weekly clicks-per-impression', context:'Marketing claims a lift. Look at the data.' },
+  { name:'Patient recovery rate', context:'A new protocol started during the window. Did outcomes shift?' },
+  { name:'Warehouse pick errors per day', context:'A new scanner system was phased in. Any real change?' },
+  { name:'Daily active readers', context:'The paywall rules changed at some point. Did engagement move?' },
+  { name:'Energy usage per shift (kWh)', context:'Maintenance claims the retrofit cut consumption. Did it?' },
 ];
+const makeDriftRounds = (seed) => {
+  const rng = mulberry32(seed * 419 + 13);
+  const ctxs = seededShuffle(DriftContextPool, rng).slice(0, 5);
+  const kinds = seededShuffle(['shift','shift','shift','none','none'], rng);
+  return kinds.map((kind, i) => ({
+    id: i + 1, n: 50,
+    seed: 1 + Math.floor(rng() * 1e6),
+    shift: kind === 'shift' ? 12 + Math.floor(rng() * 26) : null,
+    magnitude: kind === 'shift' ? Math.round((9 + rng() * 9)) * (rng() < 0.4 ? -1 : 1) : undefined,
+    ...ctxs[i],
+  }));
+};
 
 const generateDriftSeries = ({ seed, n, shift, magnitude }) => {
   const rng = mulberry32(seed);
@@ -260,13 +278,14 @@ const generateDriftSeries = ({ seed, n, shift, magnitude }) => {
   });
 };
 
-const StationDrift = ({ onComplete, recordScore }) => {
+const StationDrift = ({ onComplete, recordScore, seed=1 }) => {
+  const rounds = React.useMemo(() => makeDriftRounds(seed), [seed]);
   const [idx, setIdx] = React.useState(0);
   const [phase, setPhase] = React.useState('decide'); // decide | reveal
   const [mark, setMark] = React.useState(null); // null | 'none' | <index>
   const [calls, setCalls] = React.useState([]);
 
-  const cur = DriftRounds[idx];
+  const cur = rounds[idx];
   const data = React.useMemo(() => generateDriftSeries(cur), [cur]);
 
   const submit = () => {
@@ -284,9 +303,9 @@ const StationDrift = ({ onComplete, recordScore }) => {
   };
 
   const next = () => {
-    if (idx + 1 >= DriftRounds.length) {
+    if (idx + 1 >= rounds.length) {
       const correct = calls.filter(c => c.correct).length;
-      recordScore('drift', { correct, total: DriftRounds.length, calls });
+      recordScore('drift', { correct, total: rounds.length, calls });
       onComplete();
       return;
     }
@@ -314,10 +333,10 @@ const StationDrift = ({ onComplete, recordScore }) => {
   };
 
   return (
-    <Panel eyebrow={`Simulation · Drift Detector · ${idx+1}/${DriftRounds.length}`} title={cur.name} accent="var(--noise)">
+    <Panel eyebrow={`Simulation · Drift Detector · ${idx+1}/${rounds.length}`} title={cur.name} accent="var(--noise)">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:14 }}>
         <span style={{ color:'var(--ink-2)', fontSize:15 }}>{cur.context}</span>
-        <ProgressDots total={DriftRounds.length} current={idx}/>
+        <ProgressDots total={rounds.length} current={idx}/>
       </div>
 
       <div style={{ background:'var(--bg-soft)', borderRadius:18, padding:14, border:'1px solid var(--line)' }}>
@@ -383,7 +402,7 @@ const StationDrift = ({ onComplete, recordScore }) => {
             </Callout>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:14 }}>
               <span className="mono" style={{ fontSize:12, color:'var(--ink-4)' }}>{calls.filter(c=>c.correct).length}/{calls.length} correct so far</span>
-              <Button onClick={next} size="lg">{idx+1 >= DriftRounds.length ? 'Finish drill →' : 'Next series →'}</Button>
+              <Button onClick={next} size="lg">{idx+1 >= rounds.length ? 'Finish drill →' : 'Next series →'}</Button>
             </div>
           </div>
         );
@@ -401,16 +420,24 @@ const CrowdQuestions = [
   { id:4, q:'Oxford University is older than the Aztec Empire.',                            truth:true,  crowd:.40, sd:.24, explain:'Teaching at Oxford dates to ~1096; the Aztec Empire formed in 1428. Oxford predates it by centuries.' },
   { id:5, q:'A typical human body contains more bacterial cells than human cells.',        truth:true,  crowd:.60, sd:.25, explain:'Recent estimates put the ratio near ~1.3:1, so bacterial cells still slightly outnumber human ones. (The old 10:1 figure was wrong.)' },
   { id:6, q:'There are more trees on Earth than stars in the Milky Way.',                  truth:true,  crowd:.45, sd:.27, explain:'~3 trillion trees vs ~100-400 billion stars in the Milky Way.' },
+  { id:7, q:'The Great Pyramid of Giza was the tallest man-made structure for over 3,000 years.', truth:true, crowd:.52, sd:.24, explain:'Built ~2560 BCE at 146m, it held the record until Lincoln Cathedral\'s spire in 1311 CE — roughly 3,800 years.' },
+  { id:8, q:'More than 10% of all humans who have ever lived are alive today.',             truth:false, crowd:.48, sd:.26, explain:'Demographers estimate ~117 billion humans have ever been born; ~8 billion alive today is about 7%.' },
+  { id:9, q:'Honey stored sealed can stay edible for thousands of years.',                  truth:true,  crowd:.60, sd:.24, explain:'Edible honey has been recovered from ancient Egyptian tombs — low moisture and acidity make it nearly immortal.' },
+  { id:10,q:'The summit of Mount Everest is the point on Earth\'s surface farthest from the centre of the Earth.', truth:false, crowd:.68, sd:.22, explain:'Because Earth bulges at the equator, Ecuador\'s Chimborazo — though 2.5km "shorter" — is ~2km farther from the centre.' },
+  { id:11,q:'Antarctica is the world\'s largest desert.',                                   truth:true,  crowd:.50, sd:.26, explain:'A desert is defined by precipitation, not sand. Antarctica (~14M km²) out-deserts the Sahara (~9M km²).' },
+  { id:12,q:'Goldfish have a memory span of only about three seconds.',                     truth:false, crowd:.42, sd:.25, explain:'A myth — goldfish can learn and remember tasks for months.' },
 ];
 
-const StationCrowdVs = ({ onComplete, recordScore }) => {
+const StationCrowdVs = ({ onComplete, recordScore, seed=1 }) => {
+  // draw 6 of the 12-question bank per run, seeded
+  const qs = React.useMemo(() => seededShuffle(CrowdQuestions, mulberry32(seed * 227 + 31)).slice(0, 6), [seed]);
   const [idx, setIdx] = React.useState(0);
   const [phase, setPhase] = React.useState('init'); // init | reveal | update | resolved
   const [initial, setInitial] = React.useState(50);
   const [updated, setUpdated] = React.useState(50);
   const [history, setHistory] = React.useState([]);
 
-  const cur = CrowdQuestions[idx];
+  const cur = qs[idx];
   const crowdPct = Math.round(cur.crowd * 100);
 
   const reveal = () => {
@@ -426,7 +453,7 @@ const StationCrowdVs = ({ onComplete, recordScore }) => {
   };
 
   const next = () => {
-    if (idx + 1 >= CrowdQuestions.length) {
+    if (idx + 1 >= qs.length) {
       const initialAvg = history.reduce((s,h)=>s+h.initialBrier,0)/history.length;
       const updatedAvg = history.reduce((s,h)=>s+h.updatedBrier,0)/history.length;
       const improved = updatedAvg < initialAvg;
@@ -441,7 +468,7 @@ const StationCrowdVs = ({ onComplete, recordScore }) => {
   };
 
   return (
-    <Panel eyebrow={`Simulation · Versus the Crowd · ${idx+1}/${CrowdQuestions.length}`} title="Forecast. See the crowd. Update?" accent="var(--leaf)">
+    <Panel eyebrow={`Simulation · Versus the Crowd · ${idx+1}/${qs.length}`} title="Forecast. See the crowd. Update?" accent="var(--leaf)">
       <div style={{ padding:'20px 24px', borderRadius:18, background:'var(--bg-soft)', border:'1px solid var(--line)', marginBottom:18 }}>
         <div className="serif" style={{ fontSize:21, lineHeight:1.3 }}>{cur.q}</div>
       </div>
@@ -509,7 +536,7 @@ const StationCrowdVs = ({ onComplete, recordScore }) => {
               </div>
             </div>
             <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
-              <Button size="lg" onClick={next}>{idx+1 >= CrowdQuestions.length ? 'Finish drill →' : 'Next question →'}</Button>
+              <Button size="lg" onClick={next}>{idx+1 >= qs.length ? 'Finish drill →' : 'Next question →'}</Button>
             </div>
           </div>
         );
@@ -534,15 +561,43 @@ const TournamentQuestions = [
   { cat:'Business',   q:'Apple\'s market cap is greater than the GDP of Italy.', truth:true,  explain:'Apple ~$3T market cap vs Italy GDP ~$2.2T.' },
   { cat:'Business',   q:'The most-watched single sporting event globally is the Super Bowl.', truth:false,  explain:'The FIFA World Cup Final routinely draws far more global viewers (~1.5B vs ~115M).' },
   { cat:'Business',   q:'Bill Gates dropped out of Stanford.',                  truth:false, explain:'He dropped out of Harvard, not Stanford.' },
+  { cat:'Geography',  q:'Canada\'s coastline is longer than every other country\'s coastline combined.', truth:false, explain:'Canada has the longest coastline (~202,000 km) but that\'s well short of the rest of the world combined.' },
+  { cat:'Geography',  q:'The Sahara desert is larger in area than the entire United States (including Alaska).', truth:false, explain:'Close but no — the Sahara is ~9.2M km², the US ~9.8M km².' },
+  { cat:'Geography',  q:'Africa is larger than the USA, China, and India combined.', truth:true, explain:'Africa is ~30.4M km²; the USA, China and India together are ~22.5M km². Mercator maps hide this.' },
+  { cat:'Science',    q:'Sound travels faster in water than in air.',            truth:true,  explain:'About 4.3× faster — ~1,480 m/s in water vs ~340 m/s in air.' },
+  { cat:'Science',    q:'A day on Venus is longer than its year.',               truth:true,  explain:'Venus rotates once every 243 Earth days but orbits the Sun in 225.' },
+  { cat:'Science',    q:'The Great Wall of China is visible to the naked eye from low Earth orbit.', truth:false, explain:'A persistent myth — astronauts report it is not visible unaided; it\'s long but only metres wide.' },
+  { cat:'History',    q:'Woolly mammoths were still alive when the Great Pyramid was being built.', truth:true, explain:'A dwarf population survived on Wrangel Island until ~1650 BCE — roughly 900 years after the pyramid.' },
+  { cat:'History',    q:'The Hundred Years\' War lasted exactly 100 years.',     truth:false, explain:'It ran 1337–1453 — 116 years.' },
+  { cat:'History',    q:'Vikings wore horned helmets in battle.',                truth:false, explain:'A 19th-century opera-costume invention. No horned battle helmet has ever been found.' },
+  { cat:'Business',   q:'Amazon started as an online bookstore.',                truth:true,  explain:'Founded in 1994 to sell books online; everything else came later.' },
+  { cat:'Business',   q:'The Coca-Cola Company sells more than 1 billion servings of its drinks per day.', truth:true, explain:'Roughly 1.9 billion servings per day across its brands.' },
+  { cat:'Business',   q:'More than half of the world\'s billionaires are American.', truth:false, explain:'The US leads with roughly 800 of ~2,700 billionaires — about 30%.' },
 ];
 
-const StationTournament = ({ onComplete, recordScore }) => {
+// Balanced seeded draw: 3 questions per category, 6 true / 6 false overall.
+// (Each category holds 3 true + 3 false, so a 2-2-1-1 true-count plan always works.)
+const drawTournament = (seed) => {
+  const rng = mulberry32(seed * 271 + 17);
+  const cats = ['Geography','Science','History','Business'];
+  const plan = seededShuffle([2,2,1,1], rng);
+  const out = [];
+  cats.forEach((cat, ci) => {
+    const trues  = seededShuffle(TournamentQuestions.filter(q => q.cat===cat &&  q.truth), rng).slice(0, plan[ci]);
+    const falses = seededShuffle(TournamentQuestions.filter(q => q.cat===cat && !q.truth), rng).slice(0, 3 - plan[ci]);
+    out.push(...trues, ...falses);
+  });
+  return seededShuffle(out, rng);
+};
+
+const StationTournament = ({ onComplete, recordScore, seed=1 }) => {
+  const qs = React.useMemo(() => drawTournament(seed), [seed]);
   const [idx, setIdx] = React.useState(0);
   const [prob, setProb] = React.useState(50);
-  const [phase, setPhase] = React.useState('predict'); // predict | reveal
+  const [phase, setPhase] = React.useState('predict'); // predict | reveal | done
   const [history, setHistory] = React.useState([]);
 
-  const cur = TournamentQuestions[idx];
+  const cur = qs[idx];
 
   const submit = () => {
     const p = prob / 100;
@@ -553,7 +608,7 @@ const StationTournament = ({ onComplete, recordScore }) => {
   };
 
   const next = () => {
-    if (idx + 1 >= TournamentQuestions.length) {
+    if (idx + 1 >= qs.length) {
       const avg = history.reduce((s,r)=>s+r.score,0) / history.length;
       // by category
       const cats = {};
@@ -565,7 +620,7 @@ const StationTournament = ({ onComplete, recordScore }) => {
       }
       Object.keys(cats).forEach(k => cats[k].avg = cats[k].sum / cats[k].n);
       recordScore('tournament', { avg, history, cats });
-      onComplete();
+      setPhase('done');
       return;
     }
     setIdx(idx+1);
@@ -575,8 +630,47 @@ const StationTournament = ({ onComplete, recordScore }) => {
 
   const avgSoFar = history.length ? history.reduce((s,r)=>s+r.score,0) / history.length : null;
 
+  if (phase === 'done') {
+    const avg = history.reduce((s,r)=>s+r.score,0) / history.length;
+    const correct = history.filter(h => (h.p > 0.5) === !!h.truth).length;
+    const cats = {};
+    for (const h of history) {
+      if (!cats[h.cat]) cats[h.cat] = { sum:0, n:0, correct:0 };
+      cats[h.cat].sum += h.score; cats[h.cat].n++;
+      if ((h.p > 0.5) === !!h.truth) cats[h.cat].correct++;
+    }
+    const catRows = Object.entries(cats).map(([cat, c]) => ({ cat, avg: c.sum/c.n, correct: c.correct, n: c.n })).sort((a,b)=>a.avg-b.avg);
+    return (
+      <Panel eyebrow="Simulation · Forecaster's Tournament · Resolved" title="Tournament results." accent="var(--gold)">
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14, marginBottom:16 }}>
+          <Stat label="Avg Brier" value={avg.toFixed(3)} tone={avg < 0.15 ? 'good' : avg < 0.28 ? 'neutral' : 'bad'} sub="always-50% scores 0.250"/>
+          <Stat label="Directional accuracy" value={`${correct}/${history.length}`} sub="calls on the right side of 50%"/>
+          <Stat label="Beat the hedger?" value={avg < 0.25 ? 'Yes' : 'No'} tone={avg < 0.25 ? 'good' : 'bad'} sub="vs. answering 50% every time"/>
+        </div>
+        <div style={{ background:'var(--bg-card)', border:'1px solid var(--line)', borderRadius:14, overflow:'hidden', marginBottom:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr 1fr', padding:'10px 14px', background:'var(--bg-soft)', borderBottom:'1px solid var(--line)' }} className="mono">
+            {['category','avg brier','accuracy'].map(hd => <span key={hd} style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.14em' }}>{hd}</span>)}
+          </div>
+          {catRows.map((r, i) => (
+            <div key={r.cat} style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr 1fr', padding:'10px 14px', borderBottom: i < catRows.length-1 ? '1px solid var(--line)' : 'none' }} className="mono">
+              <span style={{ fontSize:13, fontWeight:500 }}>{r.cat}{i===0 ? ' · your best' : ''}</span>
+              <span style={{ fontSize:13, color: r.avg < 0.2 ? 'var(--good)' : r.avg < 0.3 ? 'var(--ink-2)' : 'var(--bad)' }}>{r.avg.toFixed(3)}</span>
+              <span style={{ fontSize:13, color:'var(--ink-3)' }}>{r.correct}/{r.n}</span>
+            </div>
+          ))}
+        </div>
+        <Callout tone="signal" icon="◑">
+          <strong>Read your category split.</strong> A high Brier in one category usually isn't ignorance — it's being <em>confident</em> in that ignorance. The fix isn't knowing more trivia; it's noticing which domains deserve probabilities closer to 50%.
+        </Callout>
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
+          <Button size="lg" onClick={onComplete}>Finish drill →</Button>
+        </div>
+      </Panel>
+    );
+  }
+
   return (
-    <Panel eyebrow={`Simulation · Forecaster's Tournament · ${idx+1}/${TournamentQuestions.length}`} title="Rapid forecasting." accent="var(--gold)">
+    <Panel eyebrow={`Simulation · Forecaster's Tournament · ${idx+1}/${qs.length}`} title="Rapid forecasting." accent="var(--gold)">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
         <Chip tone="gold">{cur.cat}</Chip>
         {avgSoFar != null && <span className="mono" style={{ fontSize:12, color:'var(--ink-3)'}}>avg Brier: <strong style={{ color:'var(--ink)' }}>{avgSoFar.toFixed(3)}</strong></span>}
@@ -608,7 +702,7 @@ const StationTournament = ({ onComplete, recordScore }) => {
               <Stat label="Brier" value={last.score.toFixed(3)} tone={last.score < 0.15 ? 'good' : last.score < 0.3 ? 'neutral' : 'bad'}/>
             </div>
             <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
-              <Button size="lg" onClick={next}>{idx+1 >= TournamentQuestions.length ? 'See results →' : 'Next →'}</Button>
+              <Button size="lg" onClick={next}>{idx+1 >= qs.length ? 'See results →' : 'Next →'}</Button>
             </div>
           </div>
         );
