@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Briefing Room — a granularity game</title>
+<style>
+  :root {
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --accent-dark: #3730a3;
+    --ink: #1e293b;
+    --ink-soft: #475569;
+    --paper: #f8fafc;
+    --card: #ffffff;
+    --good: #15803d;
+    --good-soft: #f0fdf4;
+    --bad: #b91c1c;
+    --bad-soft: #fef2f2;
+    --line: #e2e8f0;
+    --radius: 14px;
+    --shadow: 0 4px 16px rgba(30, 41, 59, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header.site {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  h1 { font-size: 1.35rem; letter-spacing: -0.01em; }
+  .intro { color: var(--ink-soft); font-size: 0.95rem; margin-bottom: 16px; max-width: 62ch; }
+  .hud {
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 16px;
+  }
+  .hud .pill {
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; font-size: 0.85rem; box-shadow: var(--shadow);
+    display: flex; gap: 6px; align-items: center;
+  }
+  .hud .pill strong { color: var(--accent-dark); font-variant-numeric: tabular-nums; }
+  .hud .spacer { flex: 1; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    padding: 8px 14px; transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  }
+  button:hover { background: var(--accent-soft); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button.primary {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+  }
+  button.primary:hover { background: var(--accent-dark); }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 22px; margin-bottom: 16px;
+  }
+  .scenario-tag {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--accent-dark); background: var(--accent-soft);
+    border-radius: 6px; padding: 3px 8px; margin-bottom: 10px;
+  }
+  .scenario-tag.regular { color: #92400e; background: #fef3c7; }
+  h2 { font-size: 1.1rem; margin-bottom: 8px; }
+  .brief { color: var(--ink-soft); font-size: 0.95rem; margin-bottom: 14px; }
+  .estimate-line {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    background: var(--paper); border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 6px;
+  }
+  .estimate-line .num { font-size: 1.9rem; font-weight: 800; color: var(--accent-dark); font-variant-numeric: tabular-nums; }
+  .threshold-line { font-size: 0.9rem; color: var(--ink-soft); margin-bottom: 16px; padding: 0 2px; }
+  .threshold-line strong { color: var(--ink); }
+  fieldset { border: none; }
+  legend { font-weight: 700; font-size: 0.95rem; margin-bottom: 10px; }
+  .modes { display: grid; gap: 10px; }
+  .mode-btn {
+    display: block; width: 100%; text-align: left; padding: 12px 14px;
+    border-radius: 12px; border: 1.5px solid var(--line); background: var(--card);
+  }
+  .mode-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .mode-btn .m-title { font-weight: 700; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .mode-btn .m-cost { font-size: 0.8rem; font-weight: 700; color: var(--accent-dark); background: var(--accent-soft); border-radius: 999px; padding: 1px 10px; white-space: nowrap; }
+  .mode-btn .m-cost.free { color: var(--good); background: var(--good-soft); }
+  .mode-btn .m-desc { font-size: 0.85rem; color: var(--ink-soft); margin-top: 3px; }
+  .feedback { border-left: 5px solid var(--line); }
+  .feedback.good { border-left-color: var(--good); }
+  .feedback.bad { border-left-color: var(--bad); }
+  .verdict { font-weight: 800; font-size: 1.05rem; margin-bottom: 8px; }
+  .feedback.good .verdict { color: var(--good); }
+  .feedback.bad .verdict { color: var(--bad); }
+  .fb-row { font-size: 0.93rem; margin-bottom: 6px; color: var(--ink-soft); }
+  .fb-row strong { color: var(--ink); }
+  .points-line { font-weight: 700; margin: 10px 0; font-variant-numeric: tabular-nums; }
+  .lesson {
+    background: var(--accent-soft); border-radius: 10px; padding: 10px 14px;
+    font-size: 0.92rem; color: var(--accent-dark); margin: 12px 0;
+  }
+  .bonus-chip { display: inline-block; font-size: 0.8rem; font-weight: 700; border-radius: 999px; padding: 2px 10px; margin-left: 6px; }
+  .bonus-chip.yes { color: var(--good); background: var(--good-soft); }
+  .bonus-chip.no { color: var(--bad); background: var(--bad-soft); }
+  .center { text-align: center; }
+  .final-score { font-size: 2.6rem; font-weight: 800; color: var(--accent-dark); font-variant-numeric: tabular-nums; }
+  .grade-band { font-size: 1.15rem; font-weight: 700; margin: 6px 0 14px; }
+  .debrief { text-align: left; font-size: 0.94rem; color: var(--ink-soft); }
+  .debrief h3 { font-size: 0.98rem; color: var(--ink); margin: 14px 0 6px; }
+  .debrief p { margin-bottom: 8px; }
+  .rules-list { text-align: left; font-size: 0.93rem; color: var(--ink-soft); padding-left: 20px; }
+  .rules-list li { margin-bottom: 8px; }
+  .rules-list strong { color: var(--ink); }
+  dialog {
+    border: none; border-radius: var(--radius); box-shadow: 0 12px 40px rgba(30,41,59,0.25);
+    padding: 24px; max-width: 560px; width: calc(100% - 32px); margin: auto;
+  }
+  dialog::backdrop { background: rgba(30, 41, 59, 0.45); }
+  .row-gap { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+  .progressbar { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 16px; }
+  .progressbar > div { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s ease; }
+  .pb-note { font-size: 0.85rem; color: var(--ink-soft); margin-top: 8px; }
+  .best-flash { color: var(--good); font-weight: 700; }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  @media (max-width: 480px) {
+    body { padding: 10px; }
+    .card { padding: 16px; }
+    .estimate-line .num { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <h1>🕵️ The Briefing Room</h1>
+    <div>
+      <button id="rulesBtn" type="button">Rules</button>
+      <button id="resetBtn" type="button">Reset</button>
+    </div>
+  </header>
+
+  <p class="intro">You are the intelligence chief who carries analysts' probability estimates to the President — and every choice about how <em>precisely</em> to report them can make or break a decision. Can you tell when granularity is signal, and when it's just decoration?</p>
+
+  <div class="hud" aria-label="Game status">
+    <span class="pill">Round <strong id="hudRound">–</strong>/8</span>
+    <span class="pill">Score <strong id="hudScore">0</strong></span>
+    <span class="pill">Optimal calls <strong id="hudOptimal">0</strong></span>
+    <span class="spacer"></span>
+    <span class="pill">Personal best <strong id="hudBest">–</strong></span>
+  </div>
+
+  <div class="progressbar" aria-hidden="true"><div id="progressFill" style="width:0%"></div></div>
+
+  <main id="stage" aria-live="polite"></main>
+  <div id="srAnnounce" class="visually-hidden" aria-live="assertive"></div>
+</div>
+
+<dialog id="rulesDialog" aria-labelledby="rulesTitle">
+  <h2 id="rulesTitle">How to play</h2>
+  <br>
+  <ul class="rules-list">
+    <li><strong>Your job:</strong> each round, an analyst hands you a probability estimate. A decision hangs on it — the President acts only if the probability they <em>hear</em> clears a stated threshold.</li>
+    <li><strong>Your one move:</strong> choose how to report the estimate — as a <strong>vague phrase</strong> (free), <strong>rounded to the nearest 10%</strong> (costs 1 point of briefing time), or the <strong>exact figure</strong> (costs 2 points).</li>
+    <li><strong>Vague phrases are interpreted, not read:</strong> the President mentally converts "a serious possibility" into <em>some</em> number — and different listeners land anywhere in a wide band (Sherman Kent found 20%–80% for that exact phrase).</li>
+    <li><strong>Analysts differ:</strong> a <strong>superforecaster's</strong> digits are real signal — 63% genuinely means 63%. A <strong>regular analyst's</strong> estimate is honest but fuzzy: the truth may sit ±14 points away, so their final digits are mostly noise.</li>
+    <li><strong>Scoring:</strong> +12 if the President's decision matches what the true probability warranted, +3 bonus if you chose the reporting mode with the best expected payoff, minus the briefing cost. Max 112. Your best total is saved on this device.</li>
+    <li><strong>The skill:</strong> pay for precision only when it buys you something — a skilled source <em>and</em> an estimate near the decision threshold. Everywhere else, precision is money down the drain.</li>
+  </ul>
+  <div class="row-gap"><button class="primary" id="closeRules" type="button">Got it</button></div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  var COSTS = { verbal: 0, rounded: 1, exact: 2 };
+  var CORRECT_PTS = 12, OPTIMAL_BONUS = 3, MAX_SCORE = 112, BEST_KEY = "briefingRoomBest";
+
+  // Verbal bands: label used in the report, and the range a listener may read it as.
+  function verbalFor(p) {
+    if (p < 10)  return { label: "almost no chance",                lo: 2,  hi: 12 };
+    if (p < 35)  return { label: "unlikely",                        lo: 5,  hi: 40 };
+    if (p < 65)  return { label: "a serious possibility — basically a coin flip", lo: 20, hi: 80 };
+    if (p < 90)  return { label: "likely",                          lo: 55, hi: 95 };
+    return         { label: "almost certain",                       lo: 85, hi: 99 };
+  }
+  function round10(p) { return Math.min(99, Math.max(1, Math.round(p / 10) * 10)); }
+
+  var ROUNDS = [
+    {
+      tag: "Superforecaster", super_: true, p: 8, t: 50,
+      title: "The Border Buildup",
+      brief: "Satellite imagery shows minor troop movements. Your superforecaster estimates the chance of an incursion this quarter. The President will pre-position forces only if the odds exceed the threshold.",
+      decision: "pre-position forces",
+      optimal: "verbal",
+      lesson: "8% is nowhere near a 50% threshold. Any sensible reading of “almost no chance” lands on the same side of the line — so the free, vague phrase loses nothing. Precision only matters when the number is close to the decision boundary."
+    },
+    {
+      tag: "Superforecaster", super_: true, p: 63, t: 62,
+      title: "The Compound Raid",
+      brief: "A high-value target may be inside a walled compound abroad — an Abbottabad-style call. Your best superforecaster puts the target's presence at a carefully reasoned figure. The President will authorise the raid only above the threshold.",
+      decision: "authorise the raid",
+      optimal: "exact",
+      lesson: "63% vs a 62% threshold: rounding to 60% flips the decision, and this analyst's final digits are real signal (Friedman et al., 2018 — rounding superforecasters measurably hurt accuracy). Near a threshold, from a skilled source, every percentage point is load-bearing."
+    },
+    {
+      tag: "Regular analyst", super_: false, p: 57, t: 55,
+      title: "The Trade Sanction",
+      brief: "A junior desk analyst estimates the chance a rival state breaches the trade accord. Sanctions get drafted only above the threshold. The analyst is diligent — but their estimate carries real fuzz (±14 points).",
+      decision: "draft sanctions",
+      optimal: "rounded",
+      lesson: "57% rounds to 60% — the President's decision is identical either way, so paying double for the exact figure buys literally nothing. This mirrors Friedman et al.: rounding regular forecasters' estimates barely changed accuracy, because their extra digits were noise, not signal."
+    },
+    {
+      tag: "Superforecaster", super_: true, p: 94, t: 88,
+      title: "The Missile Test",
+      brief: "Signals intelligence points to an imminent missile test. Your superforecaster is nearly sure. The President will alert allies only above the threshold — and a false alert is costly.",
+      decision: "alert the allies",
+      optimal: "rounded",
+      lesson: "94% rounds to 90%, still clearing the 88% threshold — so rounding is safe and cheaper than the exact figure. But “almost certain” could be heard as anything from 85% to 99%, and an 85% reading fails the bar. Words gamble; numbers don't."
+    },
+    {
+      tag: "Superforecaster", super_: true, p: 40, t: 35,
+      title: "The Yugoslavia Estimate, 1951",
+      brief: "Sherman Kent's classic: will the Soviets invade Yugoslavia this year? NATO reinforces the region only above the threshold. Your superforecaster's estimate sits above it — but the classic phrasing would be “a serious possibility”.",
+      decision: "reinforce the region",
+      optimal: "rounded",
+      lesson: "This is Kent's real 1951 episode: readers of “serious possibility” took it to mean anything from ~20% to ~80%. Here that ambiguity straddles the 35% threshold — a pure coin toss on a war decision. A cheap “40%” settles it; the exact “40%” says the same thing for double the cost."
+    },
+    {
+      tag: "Superforecaster", super_: true, p: 55, t: 50,
+      title: "The Fifty-Fifty Trap",
+      brief: "Another compound, another target. Advisers' views range widely, but your aggregated superforecast comes out just above even. The President greenlights only above the threshold — and is tempted to shrug it off as “a coin flip”.",
+      decision: "greenlight the operation",
+      optimal: "rounded",
+      lesson: "In the real bin Laden deliberations, estimates from ~30% to 95% got verbally flattened into “fifty-fifty”. 55% is NOT 50% — it clears this threshold. Saying “coin flip” hands the decision to chance; “60%” (or 55%) preserves the side of the line the evidence actually supports."
+    },
+    {
+      tag: "Superforecaster", super_: true, p: 44, t: 41,
+      title: "The Vaccine Tender",
+      brief: "Will the outbreak strain go epidemic? Your superforecaster's estimate narrowly clears the bar at which the government pre-orders vaccines. Rounding would drag it below.",
+      decision: "pre-order vaccines",
+      optimal: "exact",
+      lesson: "44% rounds down to 40%, below the 41% trigger — rounding reverses a public-health decision. When a skilled forecaster's number sits within the rounding radius of the threshold, the “extra” granularity is exactly the part that matters."
+    },
+    {
+      tag: "Regular analyst", super_: false, p: 12, t: 60,
+      title: "The Coup Rumour",
+      brief: "A field officer relays chatter about a possible coup. Evacuation of embassy staff is triggered only above the threshold. The officer's estimate is low — and, being a regular analyst, fuzzy.",
+      decision: "evacuate embassy staff",
+      optimal: "verbal",
+      lesson: "12% from a fuzzy source, against a 60% bar: even the worst-case reading of “unlikely” (~40%) stays below the threshold. Spending briefing points on digits that are (a) noise and (b) far from the boundary fails on both counts. Save your precision budget for where it pays."
+    }
+  ];
+
+  var state, bestScore;
+
+  function loadBest() {
+    try { var v = localStorage.getItem(BEST_KEY); bestScore = v === null ? null : parseInt(v, 10); }
+    catch (e) { bestScore = null; }
+    if (isNaN(bestScore)) bestScore = null;
+  }
+  function saveBest(v) { try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {} }
+
+  function freshState() {
+    return { round: 0, score: 0, optimalCount: 0, phase: "start", truths: ROUNDS.map(function (r) {
+      if (r.super_) return r.p;
+      var noise = Math.floor(Math.random() * 29) - 14; // ±14
+      return Math.min(99, Math.max(1, r.p + noise));
+    }) };
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var stage = $("stage");
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+  }); }
+
+  function updateHud() {
+    $("hudRound").textContent = state.phase === "start" ? "–" : Math.min(state.round + 1, 8);
+    $("hudScore").textContent = state.score;
+    $("hudOptimal").textContent = state.optimalCount;
+    $("hudBest").textContent = bestScore === null ? "–" : bestScore + " / " + MAX_SCORE;
+    var pct = state.phase === "start" ? 0 : (state.round / ROUNDS.length) * 100;
+    if (state.phase === "done") pct = 100;
+    $("progressFill").style.width = pct + "%";
+  }
+
+  function announce(msg) { $("srAnnounce").textContent = msg; }
+
+  // ---------- Screens ----------
+
+  function renderStart() {
+    state.phase = "start";
+    stage.innerHTML =
+      '<div class="card center">' +
+        '<h2>Eight estimates. Eight decisions. One question:<br>when is precision worth paying for?</h2>' +
+        '<p class="brief" style="margin-top:10px">Each round costs you a choice: report an analyst’s probability as a <strong>vague phrase (free)</strong>, <strong>rounded to 10% (−1 pt)</strong>, or the <strong>exact figure (−2 pts)</strong>. The President acts on whatever number they <em>hear</em>. Score: <strong>+12</strong> per decision that matches the truth, <strong>+3</strong> per optimal reporting call, minus costs. Max <strong>112</strong>.</p>' +
+        '<div class="row-gap">' +
+          '<button class="primary" id="startBtn" type="button">Enter the briefing room</button>' +
+          '<button id="startRules" type="button">Read the rules</button>' +
+        '</div>' +
+      '</div>';
+    $("startBtn").addEventListener("click", function () { state.round = 0; renderRound(); });
+    $("startRules").addEventListener("click", openRules);
+    updateHud();
+  }
+
+  function renderRound() {
+    state.phase = "play";
+    var r = ROUNDS[state.round];
+    var v = verbalFor(r.p);
+    stage.innerHTML =
+      '<div class="card">' +
+        '<span class="scenario-tag' + (r.super_ ? "" : " regular") + '">' +
+          (r.super_ ? "★ Superforecaster · digits are signal" : "Regular analyst · estimate fuzzy ±14 pts") +
+        '</span>' +
+        '<h2>Round ' + (state.round + 1) + ": " + esc(r.title) + "</h2>" +
+        '<p class="brief">' + esc(r.brief) + "</p>" +
+        '<div class="estimate-line"><span>Analyst’s estimate:</span> <span class="num">' + r.p + "%</span></div>" +
+        '<p class="threshold-line">The President will <strong>' + esc(r.decision) + "</strong> only if the probability they hear is <strong>above " + r.t + "%</strong>.</p>" +
+        '<fieldset><legend>How do you report it?</legend><div class="modes">' +
+          modeBtn("verbal", "Say “" + esc(v.label) + "”", "Free", "The President will hear it as… some number between " + v.lo + "% and " + v.hi + "%. Who knows which.") +
+          modeBtn("rounded", "Report “" + round10(r.p) + "%” (rounded)", "−1 pt", "Nearest 10%. Cheap, unambiguous — but the fine detail is gone.") +
+          modeBtn("exact", "Report “" + r.p + "%” exactly", "−2 pts", "Full granularity — costs extra briefing time to justify the digits.") +
+        "</div></fieldset>" +
+      "</div>";
+    Array.prototype.forEach.call(stage.querySelectorAll(".mode-btn"), function (btn) {
+      btn.addEventListener("click", function () { resolveRound(btn.getAttribute("data-mode")); });
+    });
+    updateHud();
+    announce("Round " + (state.round + 1) + ". " + r.title + ". Estimate " + r.p + " percent, threshold " + r.t + " percent.");
+  }
+
+  function modeBtn(mode, title, cost, desc) {
+    return '<button type="button" class="mode-btn" data-mode="' + mode + '">' +
+      '<span class="m-title"><span>' + title + '</span><span class="m-cost' + (cost === "Free" ? " free" : "") + '">' + cost + "</span></span>" +
+      '<span class="m-desc">' + desc + "</span></button>";
+  }
+
+  function resolveRound(mode) {
+    var r = ROUNDS[state.round];
+    var truth = state.truths[state.round];
+    var heard, heardNote;
+    if (mode === "exact") { heard = r.p; heardNote = "the exact figure, " + heard + "%"; }
+    else if (mode === "rounded") { heard = round10(r.p); heardNote = "the rounded figure, " + heard + "%"; }
+    else {
+      var v = verbalFor(r.p);
+      heard = v.lo + Math.floor(Math.random() * (v.hi - v.lo + 1));
+      heardNote = "“" + v.label + "” — and mentally converted it to " + heard + "%";
+    }
+    var acted = heard > r.t;
+    var shouldAct = truth > r.t;
+    var correct = acted === shouldAct;
+    var isOptimal = mode === r.optimal;
+    var pts = (correct ? CORRECT_PTS : 0) + (isOptimal ? OPTIMAL_BONUS : 0) - COSTS[mode];
+    state.score += pts;
+    if (isOptimal) state.optimalCount++;
+
+    var optimalName = { verbal: "the free vague phrase", rounded: "the rounded 10% figure", exact: "the exact figure" }[r.optimal];
+    var truthNote = r.super_
+      ? "This was a superforecaster: the true probability was exactly <strong>" + truth + "%</strong>."
+      : "This was a regular analyst: their “" + r.p + "%” was fuzzy — the true probability was <strong>" + truth + "%</strong>.";
+
+    stage.innerHTML =
+      '<div class="card feedback ' + (correct ? "good" : "bad") + '">' +
+        '<p class="verdict">' + (correct ? "✓ Right call made" : "✗ Wrong call made") + " — the President " +
+          (acted ? "chose to " : "declined to ") + esc(r.decision) + ".</p>" +
+        '<p class="fb-row">You reported <strong>' + heardNote + "</strong>. Decision threshold: above <strong>" + r.t + "%</strong>.</p>" +
+        '<p class="fb-row">' + truthNote + " The evidence " + (shouldAct ? "warranted acting." : "did not warrant acting.") + "</p>" +
+        '<p class="points-line">' +
+          (correct ? "+" + CORRECT_PTS + " decision" : "+0 decision") +
+          (isOptimal ? " · +" + OPTIMAL_BONUS + " optimal-call bonus" : "") +
+          " · −" + COSTS[mode] + " cost = <strong>" + (pts >= 0 ? "+" : "") + pts + " pts</strong>" +
+          '<span class="bonus-chip ' + (isOptimal ? "yes" : "no") + '">' +
+            (isOptimal ? "Optimal reporting call" : "Optimal here: " + optimalName) + "</span></p>" +
+        '<div class="lesson">💡 ' + r.lesson + "</div>" +
+        '<div class="row-gap"><button class="primary" id="nextBtn" type="button">' +
+          (state.round + 1 < ROUNDS.length ? "Next round →" : "See final debrief →") + "</button></div>" +
+      "</div>";
+    updateHud();
+    announce((correct ? "Correct decision. " : "Wrong decision. ") + (pts >= 0 ? "Plus " : "Minus ") + Math.abs(pts) + " points. Score " + state.score + ".");
+    $("nextBtn").addEventListener("click", function () {
+      state.round++;
+      if (state.round < ROUNDS.length) renderRound(); else renderEnd();
+    });
+    $("nextBtn").focus();
+  }
+
+  function gradeFor(optimalCount) {
+    if (optimalCount === 8) return "Superforecaster material — flawless precision judgement";
+    if (optimalCount >= 6) return "Skilled briefer — strong feel for when granularity pays";
+    if (optimalCount >= 4) return "Developing — you sense the idea, but you're paying for (or discarding) precision at the wrong moments";
+    return "Rounded off — revisit when precision is signal vs. decoration";
+  }
+
+  function renderEnd() {
+    state.phase = "done";
+    var newBest = bestScore === null || state.score > bestScore;
+    if (newBest) { bestScore = state.score; saveBest(bestScore); }
+    var pct = Math.max(0, Math.round((state.score / MAX_SCORE) * 100));
+    stage.innerHTML =
+      '<div class="card center">' +
+        '<h2>Debrief</h2>' +
+        '<p class="final-score">' + state.score + " / " + MAX_SCORE + "</p>" +
+        '<p class="grade-band">' + pct + "% · Optimal reporting calls: " + state.optimalCount + " / 8<br>" + gradeFor(state.optimalCount) + "</p>" +
+        (newBest ? '<p class="pb-note best-flash">🏆 New personal best on this device!</p>' :
+                   '<p class="pb-note">Personal best: ' + bestScore + " / " + MAX_SCORE + "</p>") +
+        '<div class="debrief">' +
+          '<h3>What your score measured</h3>' +
+          '<p>The +3 bonuses tracked the real skill: recognising that precision has <em>value that varies</em>. It pays exactly when the source is skilled <strong>and</strong> the estimate sits near the decision threshold; elsewhere it’s an unnecessary cost — and vague words are an outright gamble. Decision points added the consequences (plus a dose of honest luck on the fuzzy-analyst rounds — sometimes even perfect reporting can’t save a noisy estimate).</p>' +
+          '<h3>How the game maps to the research</h3>' +
+          '<p><strong>Granularity is signal at the top end of skill.</strong> Friedman et al. (2018) rounded forecasters’ estimates to the nearest 5% or 10%: superforecasters’ accuracy (Brier scores) measurably worsened, while regular forecasters’ didn’t change — exactly why exact figures only earned their cost from your ★ analysts near thresholds.</p>' +
+          '<p><strong>Words destroy granularity.</strong> The vague-phrase gamble is Sherman Kent’s 1951 NATO episode: readers took “serious possibility” to mean anywhere from ~20% to ~80% — which is why he campaigned for standardised numeric probabilities at the CIA.</p>' +
+          '<p><strong>Midpoints erase information.</strong> When President Obama summarised advisers’ 30–95% range on bin Laden’s location as “a fifty-fifty proposition”, an informative spread collapsed into an uninformative coin flip — the trap in Round 6.</p>' +
+          '<p><strong>The takeaway:</strong> finer-grained probabilities let decisions land on the correct side of thresholds that coarse or verbal estimates blur across. Granularity isn’t pedantry — near a decision boundary, it <em>is</em> the decision.</p>' +
+        "</div>" +
+        '<div class="row-gap"><button class="primary" id="againBtn" type="button">Play again</button></div>' +
+      "</div>";
+    updateHud();
+    announce("Game over. Final score " + state.score + " out of " + MAX_SCORE + ".");
+    $("againBtn").addEventListener("click", resetGame);
+  }
+
+  // ---------- Rules dialog & reset ----------
+  var dlg = $("rulesDialog");
+  function openRules() {
+    if (typeof dlg.showModal === "function") dlg.showModal();
+    else dlg.setAttribute("open", "open");
+  }
+  $("rulesBtn").addEventListener("click", openRules);
+  $("closeRules").addEventListener("click", function () { dlg.close ? dlg.close() : dlg.removeAttribute("open"); });
+
+  function resetGame() { state = freshState(); renderStart(); }
+  $("resetBtn").addEventListener("click", resetGame);
+
+  loadBest();
+  resetGame();
+})();
+</script>
+</body>
+</html>
