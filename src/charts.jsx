@@ -81,59 +81,122 @@ const TimeSeriesChart = ({ data, w=520, h=220, showSignal=false, color='var(--in
   );
 };
 
-// Calibration plot — buckets of (predicted prob, observed frequency).
-// xMin lets the x-axis start at 0.5 for 2AFC quizzes (confidence can't go below
-// a coin flip), so the data fills the plot instead of cramming into one half.
-const CalibrationPlot = ({ buckets, w=380, h=380, xMin=0 }) => {
-  const pad = 44;
-  const sx = (p) => pad + ((p - xMin) / (1 - xMin)) * (w - pad*2);
-  const sy = (p) => h - pad - p * (h - pad*2);
-  const xTicks = xMin === 0 ? [0,.25,.5,.75,1] : [.5,.6,.7,.8,.9,1];
-  const yTicks = [0,.25,.5,.75,1];
+// CalibrationBreakdown — a small-sample-friendly calibration view.
+// Everything lives on ONE shared 0-100% scale: first a strip with every
+// individual answer (✓/✗ placed at the confidence you gave it), then a
+// "claim vs reality" dumbbell per confidence band — hollow marker = the
+// confidence you claimed, filled marker = how often you were actually right,
+// with the miss spelled out in words. No diagonal to decode.
+const CalibrationBreakdown = ({ entries }) => {
+  const bands = [[50,60],[60,70],[70,80],[80,90],[90,101]];
+  const rows = bands.map(([lo, hi]) => {
+    const items = entries.filter(e => e.conf >= lo && e.conf < hi);
+    if (!items.length) return null;
+    const claimed = items.reduce((s,e)=>s+e.conf,0) / items.length;
+    const actual = items.filter(e=>e.correct).length / items.length * 100;
+    return { label:`${lo}–${Math.min(hi-1,100)}%`, n:items.length, claimed, actual, gap: actual - claimed };
+  }).filter(Boolean);
+  const avgConf = entries.reduce((s,e)=>s+e.conf,0) / entries.length;
+  const accuracy = entries.filter(e=>e.correct).length / entries.length * 100;
+
+  const clamp = (v) => Math.max(1.5, Math.min(98.5, v));
+  const ticks = [0,25,50,75,100];
+  const Grid = () => ticks.map(t => (
+    <div key={t} style={{ position:'absolute', left:`${t}%`, top:0, bottom:0, width:t===50?1.5:1, background:t===50?'var(--line-2)':'var(--line)' }}/>
+  ));
+  const Axis = () => (
+    <div className="mono" style={{ position:'relative', height:15, fontSize:10, color:'var(--ink-4)', margin:'3px 0 0' }}>
+      {ticks.map(t => (
+        <span key={t} style={{ position:'absolute', left:`${t}%`, transform:'translateX(-50%)', whiteSpace:'nowrap' }}>
+          {t === 50 ? '50% · coin flip' : `${t}%`}
+        </span>
+      ))}
+    </div>
+  );
+
+  const verdictFor = (gap, n) => {
+    // with 1-2 answers in a band, the "miss" is mostly sampling noise — say so
+    if (n < 3) {
+      const dir = Math.abs(gap) <= 7 ? 'on target' : gap < 0 ? `${Math.round(-gap)} pts over` : `${Math.round(gap)} pts under`;
+      return { text: `${dir} · too few answers to judge`, color:'var(--ink-4)' };
+    }
+    if (Math.abs(gap) <= 7) return { text:'well calibrated', color:'var(--good)' };
+    if (gap < 0) return { text:`overconfident by ${Math.round(-gap)} pts`, color:'var(--bad)' };
+    return { text:`underconfident by ${Math.round(gap)} pts`, color:'var(--signal)' };
+  };
+
+  const Dumbbell = ({ row, bold }) => {
+    const v = verdictFor(row.gap, row.n);
+    const lo = clamp(Math.min(row.claimed, row.actual));
+    const hi = clamp(Math.max(row.claimed, row.actual));
+    return (
+      <div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:4 }}>
+          <span className="mono" style={{ fontSize:11.5, color: bold ? 'var(--ink)' : 'var(--ink-3)', fontWeight: bold ? 700 : 500, textTransform:'uppercase', letterSpacing:'.08em' }}>
+            {row.label} <span style={{ color:'var(--ink-4)', textTransform:'none', letterSpacing:0 }}>· {row.n} answer{row.n>1?'s':''}</span>
+          </span>
+          <span className="mono" style={{ fontSize:12, fontWeight:600, color:v.color }}>{v.text}</span>
+        </div>
+        <div style={{ position:'relative', height:32, background:'var(--bg-card)', border:`1px solid ${bold ? 'var(--line-2)' : 'var(--line)'}`, borderRadius:9, overflow:'hidden' }}>
+          <Grid/>
+          {hi - lo > 0.5 && (
+            <div style={{ position:'absolute', left:`${lo}%`, width:`${hi-lo}%`, top:'50%', height:3, transform:'translateY(-50%)', background:v.color, opacity:.4 }}/>
+          )}
+          {/* claimed = hollow */}
+          <div style={{ position:'absolute', left:`calc(${clamp(row.claimed)}% - 7px)`, top:'50%', transform:'translateY(-50%)', width:14, height:14, borderRadius:'50%', background:'var(--bg-card)', border:'2.5px solid var(--ink-3)', boxSizing:'border-box' }}/>
+          {/* actual = filled */}
+          <div style={{ position:'absolute', left:`calc(${clamp(row.actual)}% - 7px)`, top:'50%', transform:'translateY(-50%)', width:14, height:14, borderRadius:'50%', background:v.color, border:'2px solid #fff', boxSizing:'border-box', boxShadow:'var(--shadow-sm)' }}/>
+        </div>
+      </div>
+    );
+  };
+
+  // lane out overlapping answer dots
+  const seen = {};
+  const dots = entries.map((e) => {
+    const key = Math.round(e.conf / 3);
+    const lane = seen[key] || 0;
+    seen[key] = lane + 1;
+    return { ...e, lane };
+  });
+  const maxLane = Math.max(...dots.map(d=>d.lane));
+  const stripH = 34 + maxLane * 18;
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" style={{ display:'block', maxHeight:h }}>
-      {/* axes grid + tick labels */}
-      {xTicks.map((t,i)=>(
-        <g key={'x'+i}>
-          <line x1={sx(t)} x2={sx(t)} y1={sy(0)} y2={sy(1)} stroke="var(--line)" strokeDasharray="2 4"/>
-          <text x={sx(t)} y={sy(0)+16} fontSize="10" fill="var(--ink-4)" textAnchor="middle" className="mono">{Math.round(t*100)}%</text>
-        </g>
-      ))}
-      {yTicks.map((t,i)=>(
-        <g key={'y'+i}>
-          <line x1={sx(xMin)} x2={sx(1)} y1={sy(t)} y2={sy(t)} stroke="var(--line)" strokeDasharray="2 4"/>
-          <text x={sx(xMin)-8} y={sy(t)+3} fontSize="10" fill="var(--ink-4)" textAnchor="end" className="mono">{Math.round(t*100)}%</text>
-        </g>
-      ))}
-      {/* perfect-calibration diagonal (accuracy = stated confidence) */}
-      <line x1={sx(xMin)} y1={sy(xMin)} x2={sx(1)} y2={sy(1)} stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="4 5"/>
-      <text x={sx(xMin + (1-xMin)*.42)} y={sy(xMin + (1-xMin)*.42) - 8} fontSize="9.5" fill="var(--ink-4)" className="mono"
-        transform={`rotate(-45 ${sx(xMin + (1-xMin)*.42)} ${sy(xMin + (1-xMin)*.42)})`}>perfect calibration</text>
-      {/* axes */}
-      <line x1={sx(xMin)} y1={sy(0)} x2={sx(1)} y2={sy(0)} stroke="var(--ink)" strokeWidth="1.5"/>
-      <line x1={sx(xMin)} y1={sy(0)} x2={sx(xMin)} y2={sy(1)} stroke="var(--ink)" strokeWidth="1.5"/>
-      {/* connecting line for user buckets — kept subtle: with few answers per
-          bucket the segment swings are mostly sampling noise */}
-      {(() => {
-        const pts = buckets.filter(b=>b.n>0).map(b => [sx(b.p), sy(b.freq)]);
-        if (pts.length < 2) return null;
-        return <polyline points={pts.map(p=>p.join(',')).join(' ')} fill="none" stroke="var(--signal)" strokeWidth="1.5" strokeDasharray="1 4" strokeLinecap="round" opacity=".55"/>;
-      })()}
-      {/* dots (area scales with bucket size) */}
-      {buckets.map((b, i) => b.n > 0 && (
-        <g key={i}>
-          <circle cx={sx(b.p)} cy={sy(b.freq)} r={6 + Math.min(b.n, 8) * 1.5} fill="var(--signal)" opacity=".18"/>
-          <circle cx={sx(b.p)} cy={sy(b.freq)} r={5.5} fill="var(--signal)" stroke="#fff" strokeWidth="2"/>
-          <text x={sx(b.p)} y={sy(b.freq)-12} fontSize="10" fill="var(--ink-2)" textAnchor="middle" className="mono">{b.n}×</text>
-        </g>
-      ))}
-      {/* labels */}
-      <text x={sx(xMin + (1-xMin)/2)} y={h-8} textAnchor="middle" fontSize="12" fill="var(--ink-3)">your stated confidence →</text>
-      <text x={12} y={sy(.5)} textAnchor="middle" fontSize="12" fill="var(--ink-3)" transform={`rotate(-90 12 ${sy(.5)})`}>how often you were right →</text>
-      {/* corner annotations */}
-      <text x={sx(xMin + (1-xMin)*.04)} y={sy(.93)} fontSize="10" fill="var(--ink-4)" className="mono">under-confident ↑</text>
-      <text x={sx(.97)} y={sy(.10)} fontSize="10" fill="var(--ink-4)" className="mono" textAnchor="end">↓ over-confident</text>
-    </svg>
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      {/* every answer, individually */}
+      <div>
+        <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.12em', marginBottom:6 }}>
+          every answer, placed at the confidence you gave it
+        </div>
+        <div style={{ position:'relative', height:stripH, background:'var(--bg-card)', border:'1px solid var(--line)', borderRadius:9, overflow:'hidden' }}>
+          <Grid/>
+          {dots.map((e, i) => (
+            <div key={i} style={{ position:'absolute', left:`calc(${clamp(e.conf)}% - 9px)`, top: 7 + e.lane * 18,
+              width:18, height:18, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+              background: e.correct ? 'var(--leaf)' : 'var(--noise)', color:'#fff', fontSize:10, fontWeight:700, border:'2px solid #fff', boxSizing:'border-box', boxShadow:'var(--shadow-sm)' }}>
+              {e.correct ? '✓' : '✗'}
+            </div>
+          ))}
+        </div>
+        <Axis/>
+        <div style={{ fontSize:12.5, color:'var(--ink-3)', marginTop:6 }}>
+          <span style={{ color:'var(--noise-2)', fontWeight:600 }}>✗ far to the right</span> is the expensive kind of wrong — you were nearly certain, and missed. Wrong answers near the coin-flip line barely count against you.
+        </div>
+      </div>
+
+      {/* claim vs reality, band by band */}
+      <div>
+        <div className="mono" style={{ fontSize:11, color:'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.12em', marginBottom:6 }}>
+          claim vs. reality · <span style={{ display:'inline-block', width:9, height:9, borderRadius:9, border:'2px solid var(--ink-3)', verticalAlign:-1 }}/> what you claimed → <span style={{ display:'inline-block', width:10, height:10, borderRadius:10, background:'var(--ink-3)', verticalAlign:-1 }}/> how often you were right
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <Dumbbell bold row={{ label:'All answers', n:entries.length, claimed:avgConf, actual:accuracy, gap:accuracy-avgConf }}/>
+          {rows.map(r => <Dumbbell key={r.label} row={r}/>)}
+        </div>
+        <Axis/>
+      </div>
+    </div>
   );
 };
 
@@ -260,4 +323,4 @@ const BeliefBar = ({ prior, posterior, label='belief' }) => (
   </div>
 );
 
-Object.assign(window, { TimeSeriesChart, CalibrationPlot, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries, seededShuffle });
+Object.assign(window, { TimeSeriesChart, CalibrationBreakdown, DotField, BrierHistory, Histogram, BeliefBar, mulberry32, gauss, genSeries, seededShuffle });
