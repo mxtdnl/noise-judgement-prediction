@@ -171,21 +171,25 @@ const StationCalibration = ({ onComplete, recordScore, seed=1 }) => {
 
   if (phase === 'done') {
     const finalLog = log;
-    const buckets = bucketize(finalLog);
+    const avgConf = finalLog.reduce((s,e)=>s+e.conf,0) / finalLog.length;
+    const accuracy = finalLog.filter(e=>e.correct).length / finalLog.length * 100;
+    const overallGap = accuracy - avgConf;
     return (
-      <Panel eyebrow="Station 02" title="Your calibration curve" accent="var(--signal)">
-        <p style={{ color:'var(--ink-2)', marginTop:0 }}>For each confidence level you used, here's how often you were actually right. The dashed line is perfect calibration. <strong>Below the line = overconfidence.</strong></p>
-        <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr', gap:24, alignItems:'center', marginTop:12 }}>
-          <div style={{ background:'var(--bg-soft)', borderRadius:18, padding:14, border:'1px solid var(--line)'}}>
-            <CalibrationPlot buckets={buckets} xMin={0.5}/>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <Stat label="Score" value={`${finalLog.filter(e=>e.correct).length}/${finalLog.length}`} sub="raw accuracy" />
-            <Stat label="Avg. confidence" value={`${Math.round(finalLog.reduce((s,e)=>s+e.conf,0)/finalLog.length)}%`} />
-            <Stat label="Actual accuracy" value={`${Math.round(finalLog.filter(e=>e.correct).length/finalLog.length*100)}%`} tone={Math.abs(finalLog.reduce((s,e)=>s+e.conf,0)/finalLog.length - finalLog.filter(e=>e.correct).length/finalLog.length*100) > 10 ? 'bad' : 'good'} sub="should match avg. confidence"/>
-            <Callout tone="signal" icon="◔">A well-calibrated forecaster's average confidence equals their accuracy. Most people sit 10–20 points overconfident on their first try.</Callout>
-            <Callout tone="gold" icon="!">Only {finalLog.length} questions here, so each bucket holds just a handful of answers — a single lucky or unlucky call swings a point a long way. Treat this as a rough sketch of your calibration, not a verdict. Real calibration needs dozens of forecasts.</Callout>
-          </div>
+      <Panel eyebrow="Station 02" title="Your confidence vs. what actually happened" accent="var(--signal)">
+        <p style={{ color:'var(--ink-2)', marginTop:0 }}>
+          Calibration is a simple promise: <strong>when you say 80%, you should be right about 80% of the time.</strong> Below, the hollow ring is the confidence you claimed and the solid dot is how often you were actually right — the further apart they sit, the more your confidence was lying to you.
+        </p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:14, margin:'14px 0' }}>
+          <Stat label="Score" value={`${finalLog.filter(e=>e.correct).length}/${finalLog.length}`} sub="raw accuracy" />
+          <Stat label="You claimed, on avg." value={`${Math.round(avgConf)}%`} />
+          <Stat label="You delivered" value={`${Math.round(accuracy)}%`} tone={Math.abs(overallGap) > 10 ? 'bad' : 'good'} sub={Math.abs(overallGap) <= 7 ? 'well matched' : overallGap < 0 ? `${Math.round(-overallGap)} pts short of your claims` : `${Math.round(overallGap)} pts better than your claims`}/>
+        </div>
+        <div style={{ background:'var(--bg-soft)', borderRadius:18, padding:'18px 20px', border:'1px solid var(--line)'}}>
+          <CalibrationBreakdown entries={finalLog}/>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
+          <Callout tone="signal" icon="◔">A well-calibrated forecaster's claims match their hit rate at every level. Most people run 10–20 points overconfident on their first try — the fix is not knowing more, it's claiming less.</Callout>
+          <Callout tone="gold" icon="!">Only {finalLog.length} questions here, so each band holds just a handful of answers — one lucky or unlucky call moves a dot a long way. Treat this as a rough sketch, not a verdict. Real calibration needs dozens of forecasts.</Callout>
         </div>
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:18 }}>
           <Button onClick={onComplete} size="lg">Finish station →</Button>
